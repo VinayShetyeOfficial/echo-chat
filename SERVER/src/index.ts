@@ -8,6 +8,7 @@ import authRoutes from "./routes/auth";
 import channelRoutes from "./routes/channels";
 import messageRoutes from "./routes/messages";
 import { authMiddleware } from "./middleware/auth";
+import invitationRoutes from "./routes/invitations";
 
 // Initialize environment variables
 dotenv.config();
@@ -43,6 +44,7 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/channels", authMiddleware, channelRoutes);
 app.use("/api/messages", authMiddleware, messageRoutes);
+app.use("/api/invitations", invitationRoutes);
 
 // Basic test route
 app.get("/", (_req, res) => {
