@@ -1,6 +1,6 @@
 import axios from "axios";
-import { User, Channel, Message } from "../types";
-import { getToken, getCurrentUser } from "@/lib/auth";
+import type { User, Channel, Message } from "../types";
+import { getCurrentUser } from "@/lib/auth";
 
 // Update the API URL to ensure it's correctly formatted
 const API_URL = import.meta.env.VITE_API_URL || "/api";
@@ -233,8 +233,8 @@ export const getAllUsers = async (): Promise<User[]> => {
 export const createChannel = async (
   name: string,
   members: User[],
-  isPrivate: boolean = false,
-  isDirect: boolean = false
+  isPrivate = false,
+  isDirect = false
 ): Promise<Channel> => {
   try {
     const response = await apiClient.post("/channels", {
@@ -676,9 +676,7 @@ export const getUserInvitations = async (): Promise<any[]> => {
 export const getPublicInviteDetails = async (code: string): Promise<any> => {
   try {
     // Use a direct axios call instead of apiClient to avoid auth headers
-    const response = await axios.get(
-      `http://localhost:3001/api/invitations/${code}/public`
-    );
+    const response = await axios.get(`${API_URL}/invitations/${code}/public`);
     return response.data.data;
   } catch (error) {
     console.error("Get public invite details error:", error);
