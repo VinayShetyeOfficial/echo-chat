@@ -2,18 +2,24 @@ import mongoose from "mongoose";
 
 const invitationSchema = new mongoose.Schema(
   {
-    code: { type: String, required: true, unique: true },
+    code: { type: String, required: true, unique: true, index: true },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
-    email: String,
-    channelId: { type: mongoose.Schema.Types.ObjectId, ref: "Channel" },
+    email: String, // Optional email for specific invites
+    channelId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Channel",
+    },
     expires: { type: Date, required: true },
     used: { type: Boolean, default: false },
     usedAt: Date,
-    usedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    usedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
   },
   { timestamps: true }
 );
