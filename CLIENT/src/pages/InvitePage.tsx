@@ -1,11 +1,9 @@
-import React, { useEffect, useState } from "react";
+"use client";
+
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  verifyInvitation,
-  redeemInvitation,
-  getPublicInviteDetails,
-} from "@/lib/api";
+import { redeemInvitation, getPublicInviteDetails } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
   Card,
