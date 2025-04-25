@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+"use client";
+
+import { useState } from "react";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -10,7 +12,7 @@ import {
 } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Mail, LinkIcon, Copy, Share2, Check } from "lucide-react";
+import { Mail, Copy, Share2, Check } from "lucide-react";
 import { createInvitation } from "@/lib/api";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -49,16 +51,27 @@ export function InviteButton({
     setIsLoading(true);
 
     try {
-      const invitation = await createInvitation(channelId, email);
+      // Default expiration to 24 hours
+      const invitation = await createInvitation(channelId, email, 24);
       const inviteLink = `${window.location.origin}/invite/${invitation.code}`;
 
       setInviteCode(invitation.code);
       setInviteUrl(inviteLink);
 
       toast.success("Invitation link created successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create invitation:", error);
-      toast.error("Failed to create invitation link");
+
+      // More specific error message based on status code
+      if (error.response?.status === 404) {
+        toast.error(
+          "Invitation service is not available. Please try again later."
+        );
+      } else if (error.response?.status === 401) {
+        toast.error("You need to be logged in to create invitations");
+      } else {
+        toast.error("Failed to create invitation link");
+      }
     } finally {
       setIsLoading(false);
     }
