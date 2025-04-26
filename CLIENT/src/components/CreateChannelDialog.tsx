@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+"use client";
+
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +15,7 @@ import { Switch } from "./ui/switch";
 import { ScrollArea } from "./ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Search, X, Users, Lock, UserPlus, Check } from "lucide-react";
-import { User } from "../types";
+import type { User } from "../types";
 import { useChat } from "@/contexts/ChatContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -55,11 +57,14 @@ export function CreateChannelDialog({
         .then((users) => {
           // Filter out current user
           const filteredUsers = users.filter((u) => u.id !== user?.id);
+          console.log("Available users for chat:", filteredUsers);
           setAvailableUsers(filteredUsers);
         })
         .catch((error) => {
           console.error("Error loading users:", error);
-          toast.error("Failed to load users");
+          // Don't show error toast here, as it's expected that users might not be available
+          // if no invitations have been exchanged yet
+          setAvailableUsers([]);
         })
         .finally(() => {
           setIsLoading(false);
@@ -130,7 +135,7 @@ export function CreateChannelDialog({
   );
 
   const isUserSelected = (userId: string) => {
-    return selectedUsers.some((selected) => selected.id === userId);
+    return selectedUsers.some((selected) => selected._id === userId);
   };
 
   const handleSelectUser = (user: User) => {
@@ -138,7 +143,7 @@ export function CreateChannelDialog({
       setSelectedUsers([user]);
     } else {
       // Check if user is already selected to prevent duplicates
-      if (!selectedUsers.some((selected) => selected.id === user.id)) {
+      if (!selectedUsers.some((selected) => selected._id === user._id)) {
         setSelectedUsers((prev) => [...prev, user]);
       }
     }
@@ -146,7 +151,7 @@ export function CreateChannelDialog({
   };
 
   const handleRemoveUser = (userId: string) => {
-    setSelectedUsers((prev) => prev.filter((u) => u.id !== userId));
+    setSelectedUsers((prev) => prev.filter((u) => u._id !== userId));
   };
 
   const isCreateDisabled =
@@ -154,6 +159,18 @@ export function CreateChannelDialog({
     isLoading ||
     (type === "group" && (name.trim() === "" || selectedUsers.length === 0)) ||
     (type === "direct" && selectedUsers.length === 0);
+
+  // Render the empty state with invitation option
+  const renderEmptyState = () => (
+    <div className="flex flex-col items-center justify-center py-10 h-60 mt-1 rounded-md border">
+      <UserPlus className="h-12 w-12 text-muted-foreground mb-2" />
+      <h3 className="font-medium mb-1">No users available</h3>
+      <p className="text-sm text-muted-foreground mb-4 text-center px-4">
+        Invite someone to join Echo Chat to start messaging
+      </p>
+      <InviteButton variant="secondary" size="sm" />
+    </div>
+  );
 
   return (
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
@@ -191,7 +208,7 @@ export function CreateChannelDialog({
                   <div className="flex flex-wrap gap-2 mt-2">
                     {selectedUsers.map((user) => (
                       <div
-                        key={user.id}
+                        key={user._id}
                         className="flex items-center gap-1 bg-secondary rounded-full pl-1 pr-2 py-1"
                       >
                         <Avatar className="h-5 w-5">
@@ -205,7 +222,7 @@ export function CreateChannelDialog({
                           variant="ghost"
                           size="icon"
                           className="h-4 w-4 rounded-full"
-                          onClick={() => handleRemoveUser(user.id)}
+                          onClick={() => handleRemoveUser(user._id)}
                         >
                           <X className="h-3 w-3" />
                         </Button>
@@ -221,19 +238,16 @@ export function CreateChannelDialog({
                       <div className="animate-spin h-6 w-6 border-2 border-primary rounded-full border-t-transparent self-center"></div>
                     </div>
                   ) : availableUsers.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-10 h-60 mt-1 rounded-md border">
-                      <UserPlus className="h-12 w-12 text-muted-foreground mb-2" />
-                      <h3 className="font-medium mb-1">No users available</h3>
-                    </div>
+                    renderEmptyState()
                   ) : (
                     <ScrollArea className="h-60 mt-1 rounded-md border">
                       <div className="p-2">
                         {filteredUsers.length > 0 ? (
                           filteredUsers.map((user) => (
                             <div
-                              key={user.id}
+                              key={user._id}
                               className={`flex items-center gap-3 p-2 rounded-md cursor-pointer ${
-                                isUserSelected(user.id)
+                                isUserSelected(user._id)
                                   ? "bg-secondary/50"
                                   : "hover:bg-accent"
                               }`}
@@ -256,7 +270,7 @@ export function CreateChannelDialog({
                                   {user.email}
                                 </span>
                               </div>
-                              {isUserSelected(user.id) && (
+                              {isUserSelected(user._id) && (
                                 <div className="ml-auto text-primary">
                                   <Check className="h-4 w-4" />
                                 </div>
@@ -321,7 +335,7 @@ export function CreateChannelDialog({
                 <div className="flex flex-wrap gap-2">
                   {selectedUsers.map((user) => (
                     <div
-                      key={user.id}
+                      key={user._id}
                       className="flex items-center gap-1 bg-secondary rounded-full pl-1 pr-2 py-1"
                     >
                       <Avatar className="h-5 w-5">
@@ -335,7 +349,7 @@ export function CreateChannelDialog({
                         variant="ghost"
                         size="icon"
                         className="h-4 w-4 rounded-full"
-                        onClick={() => handleRemoveUser(user.id)}
+                        onClick={() => handleRemoveUser(user._id)}
                       >
                         <X className="h-3 w-3" />
                       </Button>
@@ -349,19 +363,16 @@ export function CreateChannelDialog({
                   <div className="animate-spin h-6 w-6 border-2 border-primary rounded-full border-t-transparent self-center"></div>
                 </div>
               ) : availableUsers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 h-40 rounded-md border">
-                  <UserPlus className="h-12 w-12 text-muted-foreground mb-2" />
-                  <h3 className="font-medium mb-1">No users available</h3>
-                </div>
+                renderEmptyState()
               ) : (
                 <ScrollArea className="h-40 rounded-md border">
                   <div className="p-2">
                     {filteredUsers.length > 0 ? (
                       filteredUsers.map((user) => (
                         <div
-                          key={user.id}
+                          key={user._id}
                           className={`flex items-center gap-2 p-2 rounded-md cursor-pointer ${
-                            isUserSelected(user.id)
+                            isUserSelected(user._id)
                               ? "bg-secondary/50"
                               : "hover:bg-accent"
                           }`}
@@ -377,7 +388,7 @@ export function CreateChannelDialog({
                             </AvatarFallback>
                           </Avatar>
                           <span>{user.username}</span>
-                          {isUserSelected(user.id) && (
+                          {isUserSelected(user._id) && (
                             <div className="ml-auto text-primary">
                               <Check className="h-4 w-4" />
                             </div>
@@ -408,7 +419,7 @@ export function CreateChannelDialog({
             >
               {type === "direct" ? "Create" : "Create Channel"}
               {isSubmitting && (
-                <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
               )}
             </Button>
           </div>
