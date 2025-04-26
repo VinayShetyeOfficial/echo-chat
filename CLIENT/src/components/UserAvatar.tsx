@@ -23,16 +23,28 @@ export function UserAvatar({ user, size = "md", className }: UserAvatarProps) {
 
   const getInitials = (name: string | undefined) => {
     if (!name) return "?";
-    return name
-      .split(" ")
-      .map((part) => part[0])
-      .join("")
-      .toUpperCase()
-      .substring(0, 2);
+
+    try {
+      return name
+        .split(" ")
+        .map((part) => part[0])
+        .join("")
+        .toUpperCase()
+        .substring(0, 2);
+    } catch (error) {
+      console.error("Error getting initials for name:", name);
+      return "?";
+    }
   };
 
-  // If no user is provided, show a placeholder
-  if (!user) {
+  // Determine status class based on user's online status
+  const getStatusClass = () => {
+    if (!user) return "bg-gray-400"; // Offline/unknown
+    return user.isOnline ? "bg-green-500" : "bg-gray-400"; // Online or offline
+  };
+
+  // If no user is provided or user data is incomplete, show a placeholder
+  if (!user || !user.username) {
     return (
       <Avatar className={cn(getSizeClass(), className)}>
         <AvatarFallback className="bg-chat-primary/10 text-chat-primary font-medium">
@@ -43,11 +55,22 @@ export function UserAvatar({ user, size = "md", className }: UserAvatarProps) {
   }
 
   return (
-    <Avatar className={cn(getSizeClass(), className)}>
-      <AvatarImage src={user.avatar} alt={user?.username || "User"} />
-      <AvatarFallback className="bg-chat-primary/10 text-chat-primary font-medium">
-        {getInitials(user.username)}
-      </AvatarFallback>
-    </Avatar>
+    <div className="relative">
+      <Avatar className={cn(getSizeClass(), className)}>
+        <AvatarImage src={user.avatar} alt={user.username || "User"} />
+        <AvatarFallback className="bg-chat-primary/10 text-chat-primary font-medium">
+          {getInitials(user.username)}
+        </AvatarFallback>
+      </Avatar>
+      {/* Add status indicator for direct message avatars */}
+      {size !== "sm" && (
+        <span
+          className={cn(
+            "absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background",
+            getStatusClass()
+          )}
+        />
+      )}
+    </div>
   );
 }
