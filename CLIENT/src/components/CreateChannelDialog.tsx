@@ -135,7 +135,7 @@ export function CreateChannelDialog({
   );
 
   const isUserSelected = (userId: string) => {
-    return selectedUsers.some((selected) => selected._id === userId);
+    return selectedUsers.some((selected) => selected.id === userId);
   };
 
   const handleSelectUser = (user: User) => {
@@ -143,7 +143,7 @@ export function CreateChannelDialog({
       setSelectedUsers([user]);
     } else {
       // Check if user is already selected to prevent duplicates
-      if (!selectedUsers.some((selected) => selected._id === user._id)) {
+      if (!selectedUsers.some((selected) => selected.id === user.id)) {
         setSelectedUsers((prev) => [...prev, user]);
       }
     }
@@ -151,7 +151,7 @@ export function CreateChannelDialog({
   };
 
   const handleRemoveUser = (userId: string) => {
-    setSelectedUsers((prev) => prev.filter((u) => u._id !== userId));
+    setSelectedUsers((prev) => prev.filter((u) => u.id !== userId));
   };
 
   const isCreateDisabled =
@@ -208,7 +208,7 @@ export function CreateChannelDialog({
                   <div className="flex flex-wrap gap-2 mt-2">
                     {selectedUsers.map((user) => (
                       <div
-                        key={user._id}
+                        key={user.id}
                         className="flex items-center gap-1 bg-secondary rounded-full pl-1 pr-2 py-1"
                       >
                         <Avatar className="h-5 w-5">
@@ -222,7 +222,7 @@ export function CreateChannelDialog({
                           variant="ghost"
                           size="icon"
                           className="h-4 w-4 rounded-full"
-                          onClick={() => handleRemoveUser(user._id)}
+                          onClick={() => handleRemoveUser(user.id)}
                         >
                           <X className="h-3 w-3" />
                         </Button>
@@ -245,15 +245,15 @@ export function CreateChannelDialog({
                         {filteredUsers.length > 0 ? (
                           filteredUsers.map((user) => (
                             <div
-                              key={user._id}
+                              key={user.id}
                               className={`flex items-center gap-3 p-2 rounded-md cursor-pointer ${
-                                isUserSelected(user._id)
+                                isUserSelected(user.id)
                                   ? "bg-secondary/50"
                                   : "hover:bg-accent"
                               }`}
                               onClick={() => handleSelectUser(user)}
                             >
-                              <Avatar>
+                              <Avatar className="h-8 w-8">
                                 <AvatarImage
                                   src={user.avatar}
                                   alt={user.username}
@@ -262,18 +262,16 @@ export function CreateChannelDialog({
                                   {user.username.charAt(0).toUpperCase()}
                                 </AvatarFallback>
                               </Avatar>
-                              <div className="flex flex-col">
-                                <span className="font-medium">
+                              <div className="flex flex-col truncate">
+                                <span className="font-medium truncate">
                                   {user.username}
                                 </span>
-                                <span className="text-xs text-muted-foreground">
+                                <span className="text-xs text-muted-foreground truncate">
                                   {user.email}
                                 </span>
                               </div>
-                              {isUserSelected(user._id) && (
-                                <div className="ml-auto text-primary">
-                                  <Check className="h-4 w-4" />
-                                </div>
+                              {isUserSelected(user.id) && (
+                                <Check className="h-4 w-4 ml-auto text-primary" />
                               )}
                             </div>
                           ))
@@ -335,7 +333,7 @@ export function CreateChannelDialog({
                 <div className="flex flex-wrap gap-2">
                   {selectedUsers.map((user) => (
                     <div
-                      key={user._id}
+                      key={user.id}
                       className="flex items-center gap-1 bg-secondary rounded-full pl-1 pr-2 py-1"
                     >
                       <Avatar className="h-5 w-5">
@@ -349,7 +347,7 @@ export function CreateChannelDialog({
                         variant="ghost"
                         size="icon"
                         className="h-4 w-4 rounded-full"
-                        onClick={() => handleRemoveUser(user._id)}
+                        onClick={() => handleRemoveUser(user.id)}
                       >
                         <X className="h-3 w-3" />
                       </Button>
@@ -370,9 +368,9 @@ export function CreateChannelDialog({
                     {filteredUsers.length > 0 ? (
                       filteredUsers.map((user) => (
                         <div
-                          key={user._id}
+                          key={user.id}
                           className={`flex items-center gap-2 p-2 rounded-md cursor-pointer ${
-                            isUserSelected(user._id)
+                            isUserSelected(user.id)
                               ? "bg-secondary/50"
                               : "hover:bg-accent"
                           }`}
@@ -388,7 +386,7 @@ export function CreateChannelDialog({
                             </AvatarFallback>
                           </Avatar>
                           <span>{user.username}</span>
-                          {isUserSelected(user._id) && (
+                          {isUserSelected(user.id) && (
                             <div className="ml-auto text-primary">
                               <Check className="h-4 w-4" />
                             </div>
