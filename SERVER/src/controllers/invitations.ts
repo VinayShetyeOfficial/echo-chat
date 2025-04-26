@@ -110,11 +110,7 @@ export const verifyInvitation = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Redeem an invitation - join the channel or register via invite
- * @route POST /api/invitations/:code/redeem
- * @access Private
- */
+// Update the redeemInvitation function to properly mark invitations as used
 export const redeemInvitation = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
@@ -155,6 +151,8 @@ export const redeemInvitation = async (req: Request, res: Response) => {
     invitation.usedAt = new Date();
     invitation.usedBy = userId;
     await invitation.save();
+
+    console.log(`Invitation ${code} redeemed by user ${userId}`);
 
     // If the invitation is for a channel, add the user to the channel
     if (invitation.channelId) {
