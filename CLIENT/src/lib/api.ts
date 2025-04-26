@@ -320,8 +320,14 @@ export const getChannels = async (): Promise<Channel[]> => {
     });
 
     return channels;
-  } catch (error) {
-    // Instead of logging to console, return empty array
+  } catch (error: any) {
+    // Handle 401 error (unauthorized) or any other error gracefully
+    if (error.response && error.response.status === 401) {
+      console.log("No channels or direct chats available for new account.");
+    } else {
+      console.error("Error fetching channels:", error);
+    }
+    // Return empty array in all error cases
     return [];
   }
 };
