@@ -143,6 +143,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [socket, activeChannel]);
 
   const fetchMessages = async (channelId: string) => {
+    // Skip if no channelId is provided
+    if (!channelId) {
+      console.log("No channel ID provided, skipping message fetch");
+      setMessages([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -292,8 +300,15 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
 
     try {
       const recipient = isDirect ? selectedUsers[0] : null;
+
+      // Ensure the recipient is valid
+      if (isDirect && (!recipient || !recipient.id)) {
+        throw new Error("Invalid recipient for direct message");
+      }
+
       const channelName = isDirect ? recipient?.username : name;
 
+      // Create channel via API
       const newCh = await apiCreateChannel(
         channelName!,
         selectedUsers,
@@ -301,11 +316,32 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
         isDirect
       );
 
+      // For local display, create a properly formatted channel object
       const processed: Channel = {
         ...newCh,
         name: channelName!,
         unreadCount: 0,
-        members: isDirect ? [user, recipient!] : [user, ...selectedUsers],
+        // For direct messages, ensure the members array contains valid User objects
+        members: isDirect
+          ? [
+              // Current user
+              {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                isOnline: user.isOnline,
+                ...(user.avatar && { avatar: user.avatar }),
+              },
+              // Recipient
+              {
+                id: recipient!.id,
+                username: recipient!.username,
+                email: recipient!.email,
+                isOnline: recipient!.isOnline,
+                ...(recipient!.avatar && { avatar: recipient!.avatar }),
+              },
+            ]
+          : [user, ...selectedUsers],
         type: isDirect ? "direct" : "group",
         isPrivate: isPrivate || isDirect,
         createdAt: newCh.createdAt || new Date(),
@@ -318,8 +354,16 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
         setChannels((prev) => [processed, ...prev]);
       }
 
+      // Set the active channel first and make sure it's properly set
+      // before fetching messages
       setActiveChannel(processed);
-      await fetchMessages(processed.id);
+
+      // Ensure channel ID is defined before fetching messages
+      if (processed.id) {
+        await fetchMessages(processed.id);
+      } else {
+        console.warn("New channel created but ID is undefined");
+      }
 
       sonnerToast.success(
         isDirect
