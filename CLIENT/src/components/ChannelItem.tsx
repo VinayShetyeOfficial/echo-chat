@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from "react";
+import React, { useMemo } from "react";
 import { Channel, User } from "@/types";
 import { UserAvatar } from "./UserAvatar";
 import { cn } from "@/lib/utils";
@@ -12,11 +12,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
-import { debugCurrentUser } from "@/lib/auth";
 
 interface ChannelItemProps {
   channel: Channel;
   active: boolean;
+  recipient?: User;
   onClick: () => void;
   onDeleteChat?: (channelId: string) => void;
   onArchiveChat?: (channelId: string) => void;
@@ -29,6 +29,7 @@ const ChannelItem: React.FC<ChannelItemProps> = React.memo(
   ({
     channel,
     active,
+    recipient: propRecipient,
     onClick,
     onDeleteChat,
     onArchiveChat,
@@ -39,36 +40,34 @@ const ChannelItem: React.FC<ChannelItemProps> = React.memo(
     const { user: currentUser } = useAuth();
 
     const recipient = useMemo(() => {
+      if (propRecipient) {
+        return propRecipient;
+      }
+
       if (channel.type === "direct" && currentUser) {
-        const otherUser = channel.members.find(
-          (member) => member.id !== currentUser.id
-        );
-        return otherUser || null;
+        const members = channel.members as any[];
+
+        const otherMember = members.find((member) => {
+          if (!member) return false;
+          return (
+            (member.id && member.id !== currentUser.id) ||
+            (member.userId && member.userId !== currentUser.id)
+          );
+        });
+
+        if (otherMember) {
+          if (otherMember.user) return otherMember.user;
+          if (otherMember.username) return otherMember;
+        }
       }
       return null;
-    }, [channel.members, channel.type, currentUser?.id]);
-
-    useEffect(() => {
-      if (channel.lastMessage) {
-        console.log(
-          `CHANNEL ITEM [${channel.name}] - Current AuthContext User:`,
-          currentUser
-            ? { id: currentUser.id, username: currentUser.username }
-            : "None"
-        );
-        debugCurrentUser();
-      }
-    }, [channel.name, channel.lastMessage, currentUser]);
+    }, [channel.members, channel.type, currentUser?.id, propRecipient]);
 
     let name: string = "";
 
     if (channel.type === "direct") {
-      if (
-        recipient &&
-        typeof recipient === "object" &&
-        "username" in recipient
-      ) {
-        name = recipient.username as string;
+      if (recipient && recipient.username) {
+        name = recipient.username;
       } else if (channel.name) {
         name = channel.name;
       } else {
