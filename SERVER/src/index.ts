@@ -5,6 +5,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import mongoose from "mongoose";
 import authRoutes from "./routes/auth";
+import userRoutes from "./routes/users";
 import channelRoutes from "./routes/channels";
 import messageRoutes from "./routes/messages";
 import { authMiddleware } from "./middleware/auth";
@@ -42,6 +43,7 @@ app.use(express.json());
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes); // Make sure this is registered
 app.use("/api/channels", authMiddleware, channelRoutes);
 app.use("/api/messages", authMiddleware, messageRoutes);
 app.use("/api/invitations", invitationRoutes);
