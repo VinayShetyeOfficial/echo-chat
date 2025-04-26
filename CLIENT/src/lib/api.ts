@@ -160,8 +160,14 @@ export const channelApi = {
 
 // Messages API
 export const messageApi = {
-  getMessages: (channelId: string) =>
-    fetchApi(`/messages?channelId=${channelId}`),
+  getMessages: (channelId: string) => {
+    // Handle undefined channelId gracefully
+    if (!channelId) {
+      console.log("No channel ID provided for message fetch");
+      return Promise.resolve({ data: [] });
+    }
+    return fetchApi(`/messages?channelId=${channelId}`);
+  },
   sendMessage: (data: any) =>
     fetchApi("/messages", {
       method: "POST",
@@ -222,7 +228,18 @@ export const getUser = async (userId: string): Promise<User> => {
 export const getAllUsers = async (): Promise<User[]> => {
   try {
     const response = await apiClient.get("/users");
-    return response.data.data;
+    // Ensure we map _id to id for client-side consistency
+    if (response.data && Array.isArray(response.data.data)) {
+      return response.data.data.map((user: any) => ({
+        id: user._id || user.id, // Map _id to id
+        username: user.username,
+        email: user.email,
+        isOnline: user.isOnline,
+        lastSeen: user.lastSeen ? new Date(user.lastSeen) : undefined,
+        avatar: user.avatar,
+      }));
+    }
+    return []; // Return empty array if data is not as expected
   } catch (error) {
     console.error("Get all users error:", error);
     throw error;
@@ -237,13 +254,64 @@ export const createChannel = async (
   isDirect = false
 ): Promise<Channel> => {
   try {
+    // Filter out any invalid members and ensure we have their IDs
+    const validMembers = members.filter((member) => {
+      if (!member) return false;
+
+      // Ensure member has a valid ID (string)
+      return member.id && typeof member.id === "string";
+    });
+
+    // Log warning if we filtered any members
+    if (validMembers.length !== members.length) {
+      console.warn("Some members were invalid and have been filtered out");
+    }
+
+    // For direct messages, make sure we have exactly one recipient
+    if (isDirect && validMembers.length !== 1) {
+      console.error("Direct messages must have exactly one recipient");
+      throw new Error("Direct messages must have exactly one recipient");
+    }
+
+    // Extract member IDs, ensuring they're valid strings
+    const memberIds = validMembers
+      .map((member) => {
+        // We've already filtered validMembers, so member and member.id should exist
+        // But we double-check for safety
+        if (!member || !member.id) {
+          console.error(
+            "Unexpected invalid member in validMembers list:",
+            member
+          );
+          return null; // Should not happen, but return null if it does
+        }
+
+        // Handle potential ObjectId structure if needed (though filtering should prevent this)
+        if (typeof member.id === "object" && (member.id as any)._id) {
+          return (member.id as any)._id;
+        }
+
+        // Return the string ID
+        return member.id;
+      })
+      .filter((id): id is string => id !== null); // Filter out any potential nulls
+
+    // Create the channel
     const response = await apiClient.post("/channels", {
       name,
       type: isDirect ? "direct" : "group",
       isPrivate,
-      memberIds: members.map((member) => member.id),
+      memberIds: memberIds,
     });
-    return response.data.data;
+
+    // Map _id to id in the response data
+    const createdChannelData = response.data.data;
+    if (createdChannelData && createdChannelData._id) {
+      createdChannelData.id = createdChannelData._id;
+      delete createdChannelData._id; // Optional: remove _id if not needed
+    }
+
+    return createdChannelData;
   } catch (error) {
     console.error("Create channel error:", error);
     throw error;
@@ -257,6 +325,72 @@ export const getChannels = async (): Promise<Channel[]> => {
 
     // Transform the server response to match client's expected format
     let channels = response.data.data.map((channel: any) => {
+      // Process members: Ensure each member is a valid User object
+      const processedMembers = (channel.members || [])
+        .map((member: any): User | null => {
+          // Explicit return type
+          if (!member) return null;
+          let userObject: Partial<User> | null = null;
+
+          // Case 1: Member has a populated user object (member.userId is an object)
+          if (
+            member.userId &&
+            typeof member.userId === "object" &&
+            member.userId.username
+          ) {
+            userObject = {
+              id: member.userId._id || member.userId.id,
+              username: member.userId.username,
+              email: member.userId.email,
+              isOnline: member.userId.isOnline, // Directly use the value
+              lastSeen: member.userId.lastSeen
+                ? new Date(member.userId.lastSeen)
+                : undefined,
+              avatar: member.userId.avatar,
+            };
+          }
+          // Case 2: Member itself is the User object (direct structure)
+          else if (member.id && member.username) {
+            userObject = {
+              id: member.id,
+              username: member.username,
+              email: member.email,
+              isOnline: member.isOnline, // Directly use the value
+              lastSeen: member.lastSeen ? new Date(member.lastSeen) : undefined,
+              avatar: member.avatar,
+            };
+          }
+          // Case 3: Member only has a userId string reference
+          else if (member.userId && typeof member.userId === "string") {
+            console.warn(
+              `[getChannels] Member data incomplete for channel ${channel.id}, only userId found: ${member.userId}`
+            );
+            userObject = {
+              id: member.userId,
+              username: "Loading...",
+              email: "",
+              isOnline: false, // Placeholder status
+            };
+          }
+
+          // Validate and return the final User object or null
+          if (userObject && userObject.id && userObject.username) {
+            // Ensure isOnline is explicitly boolean, default to false if undefined/null
+            userObject.isOnline =
+              typeof userObject.isOnline === "boolean"
+                ? userObject.isOnline
+                : false;
+            return userObject as User;
+          }
+
+          console.warn(
+            `[getChannels] Could not process member for channel ${channel.id}:`,
+            member
+          );
+          return null; // Ignore invalid member structures
+        })
+        .filter((member): member is User => member !== null); // Filter out nulls and assert type
+
       // Transform the lastMessage if it exists
       let lastMessage = null;
       if (channel.lastMessage) {
@@ -269,12 +403,12 @@ export const getChannels = async (): Promise<Channel[]> => {
         // For direct messages with missing sender, we need special handling
         if (!messageSender && channel.type === "direct") {
           // Find other member (potential recipient) and current user in the channel
-          const otherMember = channel.members?.find(
-            (member: any) => currentUser && member.id !== currentUser.id
+          const otherMember = processedMembers.find(
+            (member: User) => currentUser && member.id !== currentUser.id
           );
 
-          const currentUserMember = channel.members?.find(
-            (member: any) => currentUser && member.id === currentUser.id
+          const currentUserMember = processedMembers.find(
+            (member: User) => currentUser && member.id === currentUser.id
           );
 
           // ONLY auto-assign if we can confidently determine the message direction
@@ -284,9 +418,12 @@ export const getChannels = async (): Promise<Channel[]> => {
             currentUserMember &&
             channel.name === otherMember.username
           ) {
+            // Check based on the message's userId or createdBy field
             if (
-              channel.lastMessage.userId === currentUser.id ||
-              channel.lastMessage.createdBy === currentUser.id
+              (channel.lastMessage.userId &&
+                channel.lastMessage.userId === currentUser.id) ||
+              (channel.lastMessage.createdBy &&
+                channel.lastMessage.createdBy === currentUser.id)
             ) {
               messageSender = currentUser;
             }
@@ -308,6 +445,7 @@ export const getChannels = async (): Promise<Channel[]> => {
 
       return {
         ...channel,
+        members: processedMembers, // Use the processed members
         lastMessage: lastMessage,
       };
     });
