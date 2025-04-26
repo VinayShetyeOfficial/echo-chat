@@ -30,7 +30,7 @@ import { UserAvatar } from "./UserAvatar";
 import { Channel, User } from "@/types";
 import { cn } from "@/lib/utils";
 import { SettingsDialog } from "./SettingsDialog";
-import { toast } from "@/components/ui/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { InviteButton } from "./InviteButton";
 
 interface ChatSidebarProps {
@@ -38,14 +38,6 @@ interface ChatSidebarProps {
   onToggle: () => void;
   onCreateChannel: (type: "group" | "direct") => void;
 }
-
-const isUserObject = (obj: any): obj is User =>
-  obj && typeof obj === "object" && "username" in obj;
-
-const isChannelMemberWithUser = (
-  obj: any
-): obj is { user: User; userId: string } =>
-  obj && typeof obj === "object" && "userId" in obj && "user" in obj;
 
 export function ChatSidebar({
   isOpen,
@@ -60,27 +52,40 @@ export function ChatSidebar({
     "all"
   );
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const { toast } = useToast();
+  const [recipient, setRecipient] = useState<User | null>(null);
 
   useEffect(() => {
-    if (activeChannel?.id && user) {
-      const recipient = activeChannel.members.find((member) =>
-        isUserObject(member)
-          ? member.id !== user.id
-          : isChannelMemberWithUser(member)
-          ? member.userId !== user.id
-          : false
-      );
+    if (activeChannel && activeChannel.type === "direct" && user) {
+      // Cast the channel members to any[] to handle different member structures
+      const members = activeChannel.members as any[];
 
-      if (recipient) {
-        console.log(
-          `Active channel recipient: ${activeChannel.id}`,
-          isUserObject(recipient)
-            ? recipient
-            : isChannelMemberWithUser(recipient)
-            ? recipient.user
-            : null
-        );
+      // For direct messages, find the other user
+      const otherMember = members.find((member) => {
+        if (!member) return false;
+
+        // If member has a userId property (ChannelMember)
+        if (member.userId && member.userId !== user.id) return true;
+
+        // If member is a User object
+        if (member.id && member.id !== user.id) return true;
+
+        return false;
+      });
+
+      // Get the user from the member object, handling different structures
+      let otherUser = null;
+      if (otherMember) {
+        if (otherMember.user && otherMember.user.username) {
+          // Case 1: Member has a user object
+          otherUser = otherMember.user;
+        } else if (otherMember.username) {
+          // Case 2: Member is a User object
+          otherUser = otherMember;
+        }
       }
+
+      setRecipient(otherUser);
     }
   }, [activeChannel?.id, user?.id]);
 
@@ -95,52 +100,59 @@ export function ChatSidebar({
       let recipient: User | undefined = undefined;
 
       if (channel.type === "direct" && user) {
-        const otherMember = channel.members.find((member) => {
-          // First, check if this is a ChannelMember object (has userId)
-          if (member && typeof member === "object" && "userId" in member) {
-            return member.userId !== user.id;
-          }
+        // Treat members as any[] to handle different structures
+        const members = channel.members as any[];
 
-          // Second, check if this is a User object (has id directly)
-          if (member && typeof member === "object" && "id" in member) {
-            return member.id !== user.id;
-          }
+        for (const member of members) {
+          // Skip null or undefined members
+          if (!member) continue;
 
-          return false;
-        });
+          let found = false;
 
-        // Extract the actual user from the membership record with proper typing
-        if (otherMember) {
-          if ("user" in otherMember && otherMember.user) {
-            // Make sure otherMember.user has the right shape
-            const userObj = otherMember.user as User;
-            if (
-              userObj &&
-              typeof userObj === "object" &&
-              "username" in userObj
-            ) {
-              recipient = userObj;
+          // Case 1: Member has userId property (ChannelMember)
+          if (member.userId && member.userId !== user.id) {
+            if (member.user && member.user.username) {
+              recipient = member.user;
+              found = true;
+            } else {
+              // Log the proper userId, handling the case where it might be an object
+              const userId =
+                typeof member.userId === "object"
+                  ? JSON.stringify(member.userId)
+                  : member.userId;
+              console.log(
+                `Direct message: User details needed for ID: ${userId}`
+              );
             }
-          } else if ("username" in otherMember) {
-            // If it's already a User object
-            recipient = otherMember as User;
-          } else if ("userId" in otherMember) {
-            // If we need to fetch user details
-            const userId = otherMember.userId as string;
-            console.log("Need to fetch user details for:", userId);
-            // You could make an API call here to fetch user details
           }
+          // Case 2: Member is a User object
+          else if (member.id && member.id !== user.id && member.username) {
+            recipient = member;
+            found = true;
+          }
+
+          if (found) break;
         }
 
-        console.log("Found recipient for channel:", channel.id, recipient);
+        // Log appropriate message based on whether we found a recipient
+        if (recipient && recipient.username) {
+          console.log(
+            `Direct message: Found recipient ${
+              recipient.username
+            } for channel ${channel.id || "new"}`
+          );
 
-        // If we have a valid recipient with a username, ensure the channel has a name
-        if (recipient && "username" in recipient) {
-          // For direct messages, the channel name should be the OTHER person's name
+          // Update channel name for direct messages
           channel = {
             ...channel,
-            name: recipient.username as string,
+            name: recipient.username,
           };
+        } else {
+          console.log(
+            `Direct message: No valid recipient found for channel ${
+              channel.id || "new"
+            }, using fallback name: ${channel.name || "Unknown"}`
+          );
         }
       }
 
@@ -390,7 +402,7 @@ export function ChatSidebar({
           ) : (
             visibleChannels.map(({ channel, recipient }) => (
               <ChannelItem
-                key={channel.id}
+                key={`channel-${channel.id}`}
                 channel={channel}
                 recipient={recipient}
                 active={activeChannel?.id === channel.id}
