@@ -28,10 +28,25 @@ router.post("/", async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
+    // Validate memberIds to ensure they're all valid strings
+    const validMemberIds = Array.isArray(memberIds)
+      ? memberIds.filter((id) => id && typeof id === "string")
+      : [];
+
+    // Log warning if any member IDs were filtered out
+    if (
+      Array.isArray(memberIds) &&
+      validMemberIds.length !== memberIds.length
+    ) {
+      console.warn(
+        `Some member IDs were invalid and filtered out. Original: ${memberIds.length}, Valid: ${validMemberIds.length}`
+      );
+    }
+
     // Create channel members array with the creator as admin
     const members = [
       { userId, role: "admin" },
-      ...(memberIds || []).map((id: string) => ({
+      ...validMemberIds.map((id: string) => ({
         userId: id,
         role: "member",
       })),
