@@ -8,49 +8,50 @@ export function ChatHeader() {
   const { activeChannel } = useChat();
   const { user } = useAuth();
 
-  // First define proper typeguards
-  const isUserObject = (obj: any): obj is User =>
-    obj && typeof obj === "object" && "username" in obj;
-
-  const isChannelMemberWithUser = (
-    obj: any
-  ): obj is { user: User; userId: string } =>
-    obj && typeof obj === "object" && "userId" in obj && "user" in obj;
-
-  // Use a more comprehensive useMemo to calculate the recipient
+  // Use a comprehensive and safer approach to find the recipient
   const recipient = useMemo(() => {
-    if (activeChannel?.type !== "direct" || !user) {
+    if (!activeChannel || activeChannel.type !== "direct" || !user) {
       return null;
     }
 
-    // Find the other member (not the current user)
-    const otherMember = activeChannel.members.find((member) => {
-      // If it's a User object directly
-      if (isUserObject(member)) {
-        return member.id !== user.id;
-      }
+    try {
+      // Cast members to any[] to avoid TypeScript errors
+      const members = activeChannel.members as any[];
 
-      // If it's a ChannelMember with userId
-      if (isChannelMemberWithUser(member)) {
-        return member.userId !== user.id;
-      }
+      // Find the member that's not the current user
+      const otherMember = members.find((member) => {
+        if (!member) return false;
 
-      return false;
-    });
+        // If it has userId property (ChannelMember)
+        if (member.userId && member.userId !== user.id) {
+          return true;
+        }
 
-    // Extract and return the user object from the found member
-    if (otherMember) {
-      if (isChannelMemberWithUser(otherMember)) {
-        // Get the user from the user property
-        return otherMember.user;
-      } else if (isUserObject(otherMember)) {
-        // It's already a User object
-        return otherMember;
+        // If it's a User object with id
+        if (member.id && member.id !== user.id) {
+          return true;
+        }
+
+        return false;
+      });
+
+      if (otherMember) {
+        // Case 1: Member has a user property with user data
+        if (otherMember.user && otherMember.user.username) {
+          return otherMember.user;
+        }
+
+        // Case 2: Member is a User object directly
+        if (otherMember.username) {
+          return otherMember;
+        }
       }
+    } catch (error) {
+      console.error("Error finding recipient in ChatHeader:", error);
     }
 
     return null;
-  }, [activeChannel?.members, activeChannel?.type, user?.id]);
+  }, [activeChannel, user]);
 
   if (!activeChannel) {
     return null;
@@ -58,16 +59,29 @@ export function ChatHeader() {
 
   // Calculate display name based on recipient or channel name
   let displayName: string;
+  let prefix = "";
 
-  if (activeChannel.type === "direct" && recipient) {
-    // Use recipient username if available
-    displayName = recipient.username || activeChannel.name || "Unknown User";
+  if (activeChannel.type === "direct") {
+    if (recipient && recipient.username) {
+      displayName = recipient.username;
+    } else if (activeChannel.name) {
+      displayName = activeChannel.name;
+    } else {
+      displayName = "Unknown User";
+      prefix = "#"; // Add hash to unknown users to indicate it's a system default
+    }
   } else {
     // For group channels
-    displayName = `#${activeChannel.name || "Unnamed Channel"}`;
+    displayName = activeChannel.name || "Unnamed Channel";
+    prefix = "#";
   }
 
-  const onlineStatus = recipient?.isOnline ? "Online" : "Offline";
+  // Get online status from recipient if available, with fallback
+  const onlineStatus = recipient
+    ? recipient.isOnline
+      ? "Online"
+      : "Offline"
+    : "Offline";
 
   return (
     <div className="flex items-center gap-3 p-4 border-b">
@@ -79,7 +93,10 @@ export function ChatHeader() {
         </div>
       )}
       <div className="flex flex-col">
-        <span className="font-semibold">{displayName}</span>
+        <span className="font-semibold">
+          {prefix}
+          {displayName}
+        </span>
         {activeChannel.type === "direct" && (
           <span className="text-sm text-muted-foreground text-left">
             {onlineStatus}
