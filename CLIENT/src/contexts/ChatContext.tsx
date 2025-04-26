@@ -67,10 +67,20 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
           const initialChannel = channelsWithUnread[0];
           setActiveChannel(initialChannel);
           await fetchMessages(initialChannel.id);
+        } else if (channelsWithUnread.length === 0) {
+          // New user with no channels
+          console.log(
+            "No channels found for user. Create a new channel or start a direct message."
+          );
+          setActiveChannel(null);
+          setMessages([]);
         }
       } catch (error) {
         console.error("Error fetching channels:", error);
-        sonnerToast.error("Error fetching channels");
+        // Don't show error toast for new users with no channels
+        if (error instanceof Error && !error.message.includes("No channels")) {
+          sonnerToast.error("Error fetching channels");
+        }
       } finally {
         setLoading(false);
       }
@@ -110,13 +120,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     if (socket && activeChannel) {
       // Leave previous channel if any
-      socket.emit("leave_channel", { channelId: activeChannel._id });
+      socket.emit("leave_channel", { channelId: activeChannel.id });
 
       // Join new channel
-      socket.emit("join_channel", { channelId: activeChannel._id });
+      socket.emit("join_channel", { channelId: activeChannel.id });
 
       // Load messages for this channel
-      fetchMessages(activeChannel._id);
+      fetchMessages(activeChannel.id);
 
       // Listen for new messages
       socket.on("new_message", (message: Message) => {
@@ -161,7 +171,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const messageData = {
         text: content,
-        channelId: activeChannel._id,
+        channelId: activeChannel.id,
         attachments: [],
       };
 
@@ -330,7 +340,6 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
     activeChannel,
     messages,
     loading,
-    error,
     setActiveChannel: handleSetActiveChannel,
     sendMessage,
     editMessage,
