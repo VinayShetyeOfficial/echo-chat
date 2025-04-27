@@ -80,13 +80,17 @@ const ChannelItem: React.FC<ChannelItemProps> = React.memo(
           ? new Date(lastMessage.timestamp)
           : null;
 
+        const plainMessageText = messageText
+          .replace(/([*_~`])(.*?)\1/g, "$2")
+          .replace(/[*_~`]/g, "");
+
         const isCurrentUserSender =
           currentUser && messageSender && messageSender.id === currentUser.id;
 
-        if (messageText) {
+        if (plainMessageText) {
           formattedMsg = isCurrentUserSender
-            ? `You: ${messageText}`
-            : messageText;
+            ? `You: ${plainMessageText}`
+            : plainMessageText;
         } else if (
           lastMessage.attachments &&
           lastMessage.attachments.length > 0
