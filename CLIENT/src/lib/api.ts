@@ -391,55 +391,70 @@ export const getChannels = async (): Promise<Channel[]> => {
         })
         .filter((member): member is User => member !== null); // Filter out nulls and assert type
 
-      // Transform the lastMessage if it exists
-      let lastMessage = null;
+      // --- Add Warning if lastMessage is null from server ---
+      if (!channel.lastMessage) {
+        console.warn(
+          `[getChannels] Received null lastMessage from server for channel ${
+            channel._id || channel.id
+          }`
+        );
+      }
+      // --- END Warning ---
+
+      // --- DEBUG: Log raw lastMessage ---
       if (channel.lastMessage) {
-        // Get the message text from either format
-        const messageText = channel.lastMessage.content || "";
+        console.log(
+          `[getChannels] Raw lastMessage for channel ${
+            channel._id || channel.id
+          }:`,
+          JSON.stringify(channel.lastMessage)
+        );
+      }
+      // --- END DEBUG ---
 
-        // Try to get the sender/user from the message
-        let messageSender = channel.lastMessage.user || null;
+      // Transform the lastMessage if it exists
+      let lastMessage: Message | null = null; // Explicitly type as Message | null
+      if (channel.lastMessage) {
+        const rawLastMsg = channel.lastMessage;
 
-        // For direct messages with missing sender, we need special handling
-        if (!messageSender && channel.type === "direct") {
-          // Find other member (potential recipient) and current user in the channel
-          const otherMember = processedMembers.find(
-            (member: User) => currentUser && member.id !== currentUser.id
+        // Use the correct field 'text'
+        const messageText = rawLastMsg.text || "";
+
+        // Use the correct field 'sender' and process it
+        let processedSender: User | null = null;
+        if (rawLastMsg.sender && typeof rawLastMsg.sender === "object") {
+          // Ensure sender is an object before processing
+          processedSender = {
+            id: rawLastMsg.sender._id || rawLastMsg.sender.id || "unknown", // Ensure id field exists, provide fallback
+            username: rawLastMsg.sender.username || "Unknown",
+            email: rawLastMsg.sender.email || "",
+            isOnline:
+              typeof rawLastMsg.sender.isOnline === "boolean"
+                ? rawLastMsg.sender.isOnline
+                : false,
+            avatar: rawLastMsg.sender.avatar,
+          };
+        } else {
+          console.warn(
+            `[getChannels] Missing or invalid sender object in lastMessage for channel ${
+              channel._id || channel.id
+            }:`,
+            rawLastMsg.sender
           );
-
-          const currentUserMember = processedMembers.find(
-            (member: User) => currentUser && member.id === currentUser.id
-          );
-
-          // ONLY auto-assign if we can confidently determine the message direction
-          if (
-            otherMember &&
-            currentUser &&
-            currentUserMember &&
-            channel.name === otherMember.username
-          ) {
-            // Check based on the message's userId or createdBy field
-            if (
-              (channel.lastMessage.userId &&
-                channel.lastMessage.userId === currentUser.id) ||
-              (channel.lastMessage.createdBy &&
-                channel.lastMessage.createdBy === currentUser.id)
-            ) {
-              messageSender = currentUser;
-            }
-          }
         }
 
         lastMessage = {
-          id: channel.lastMessage._id || channel.lastMessage.id, // Map _id or id
+          id: rawLastMsg._id || rawLastMsg.id, // Map _id or id for the message itself
           text: messageText,
-          sender: messageSender, // Ensure sender is User object
-          timestamp: new Date(channel.lastMessage.createdAt || Date.now()),
-          channelId: channel.lastMessage.channelId,
-          attachments: channel.lastMessage.attachments || [],
-          reactions: channel.lastMessage.reactions || [],
-          isEdited: channel.lastMessage.isEdited || false,
-          replyTo: channel.lastMessage.replyTo,
+          sender: processedSender as User, // Assign the processed sender, assert type User
+          timestamp: new Date(
+            rawLastMsg.timestamp || rawLastMsg.createdAt || Date.now()
+          ), // Use timestamp first, then createdAt
+          channelId: rawLastMsg.channelId,
+          attachments: rawLastMsg.attachments || [],
+          reactions: rawLastMsg.reactions || [],
+          isEdited: rawLastMsg.isEdited || false,
+          replyTo: rawLastMsg.replyTo,
         };
       }
 
@@ -458,6 +473,15 @@ export const getChannels = async (): Promise<Channel[]> => {
       const bTime = b.lastMessage?.timestamp || new Date(0);
       return bTime.getTime() - aTime.getTime();
     });
+
+    // --- DEBUG: Log transformed channels before returning ---
+    /*
+    console.log(
+      "[getChannels] Transformed channels data being returned:", 
+      JSON.stringify(channels, null, 2)
+    );
+    */
+    // --- END DEBUG ---
 
     return channels;
   } catch (error: any) {
