@@ -1,12 +1,21 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useChat } from "@/contexts/ChatContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserAvatar } from "./UserAvatar";
 import { Channel, User } from "@/types";
+import { useSettings } from "@/contexts/SettingsContext";
+import { SettingsDialog } from "./SettingsDialog";
+import { Button } from "@/components/ui/button";
+import { messageApi } from "@/lib/api";
 
-export function ChatHeader() {
+interface ChatHeaderProps {
+  onToggleSidebar: () => void; // Assuming this exists if needed
+}
+
+export function ChatHeader({ onToggleSidebar }: ChatHeaderProps) {
   const { activeChannel } = useChat();
   const { user } = useAuth();
+  const { isSettingsOpen, setIsSettingsOpen } = useSettings();
 
   // Use a comprehensive and safer approach to find the recipient
   const recipient = useMemo(() => {
@@ -86,7 +95,7 @@ export function ChatHeader() {
   return (
     <div className="flex items-center gap-3 p-4 border-b">
       {activeChannel.type === "direct" ? (
-        <UserAvatar user={recipient} size="md" />
+        <UserAvatar user={recipient} size="md" showStatus={true} />
       ) : (
         <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chat-primary/10 text-chat-primary">
           #
@@ -103,6 +112,55 @@ export function ChatHeader() {
           </span>
         )}
       </div>
+
+      {/* --- TEST BUTTON START --- */}
+      <Button
+        variant="outline"
+        size="sm"
+        className="absolute top-2 right-20 z-10"
+        onClick={async () => {
+          const testMessageId = "67f8b5f78302ef0e0aa2f687"; // Replace with a valid message ID from your DB
+          if (!testMessageId) {
+            console.error("Test Error: Please provide a valid message ID");
+            return;
+          }
+          try {
+            console.log(`Testing GET /api/messages/${testMessageId}`);
+            // Temporarily bypass fetchApi/apiClient for direct fetch test
+            const token = localStorage.getItem("token");
+            const response = await fetch(
+              `http://localhost:3001/api/messages/${testMessageId}`,
+              {
+                method: "GET",
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              }
+            );
+            const data = await response.json();
+            if (!response.ok) {
+              throw new Error(
+                `Test failed with status ${response.status}: ${JSON.stringify(
+                  data
+                )}`
+              );
+            }
+            console.log("Test GET Response:", data);
+            alert("Test GET request successful! Check console.");
+          } catch (error) {
+            console.error("Test GET Request Error:", error);
+            alert("Test GET request FAILED! Check console.");
+          }
+        }}
+      >
+        Test GET Message Route
+      </Button>
+      {/* --- TEST BUTTON END --- */}
+
+      <SettingsDialog
+        open={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
     </div>
   );
 }
