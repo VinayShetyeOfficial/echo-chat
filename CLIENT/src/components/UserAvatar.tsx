@@ -6,9 +6,15 @@ export interface UserAvatarProps {
   user?: User | null;
   size?: "sm" | "md" | "lg";
   className?: string;
+  showStatus?: boolean;
 }
 
-export function UserAvatar({ user, size = "md", className }: UserAvatarProps) {
+export function UserAvatar({
+  user,
+  size = "md",
+  className,
+  showStatus = false,
+}: UserAvatarProps) {
   const getSizeClass = () => {
     switch (size) {
       case "sm":
@@ -62,8 +68,8 @@ export function UserAvatar({ user, size = "md", className }: UserAvatarProps) {
           {getInitials(user.username)}
         </AvatarFallback>
       </Avatar>
-      {/* Add status indicator for direct message avatars */}
-      {size !== "sm" && (
+      {/* Conditionally render status indicator based on showStatus prop */}
+      {showStatus && size !== "sm" && (
         <span
           className={cn(
             "absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background",
