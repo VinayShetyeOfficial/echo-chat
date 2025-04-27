@@ -155,20 +155,35 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       // Map _id to id for consistency
       const message: Message = {
         ...rawMessage,
-        id: rawMessage._id, // Map _id to id
+        id: rawMessage._id || rawMessage.id, // Map _id to id
         sender: rawMessage.sender
           ? {
               ...rawMessage.sender,
-              id: rawMessage.sender._id, // Map sender._id to sender.id
+              id: rawMessage.sender._id || rawMessage.sender.id, // Map sender._id to sender.id
             }
           : undefined,
+        // Ensure timestamp is a Date object
+        timestamp: rawMessage.timestamp
+          ? new Date(rawMessage.timestamp)
+          : new Date(),
       };
 
-      // Check if the message belongs to the currently active channel
+      // Update message list if it belongs to the active channel
       if (message.channelId === activeChannel?.id) {
         setMessages((prev) => [...prev, message]);
-      } else {
-        // Optionally: handle notifications for messages in other channels
+      }
+
+      // Update the lastMessage for the corresponding channel in the sidebar
+      setChannels((prevChannels) =>
+        prevChannels.map((channel) =>
+          channel.id === message.channelId
+            ? { ...channel, lastMessage: message }
+            : channel
+        )
+      );
+
+      // Optionally: handle notifications for messages in other channels
+      if (message.channelId !== activeChannel?.id) {
         console.log(
           `Received message for inactive channel ${message.channelId}`
         );
@@ -262,6 +277,15 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
     // 2. Optimistically update the UI
     setMessages((prev) => [...prev, optimisticMessage]);
 
+    // Also optimistically update the channel's lastMessage
+    setChannels((prevChannels) =>
+      prevChannels.map((channel) =>
+        channel.id === activeChannel.id
+          ? { ...channel, lastMessage: optimisticMessage }
+          : channel
+      )
+    );
+
     try {
       const messageData = {
         text: content,
@@ -281,23 +305,44 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       // 3. Send via API
-      const savedMessage = await messageApi.sendMessage(messageData);
+      const apiResponse = await messageApi.sendMessage(messageData);
 
-      // Process the saved message to ensure ID mapping
+      // Extract the actual message data from the response
+      const savedMessageData = apiResponse.data;
+
+      // Process the saved message data to ensure ID mapping and correct structure
       const processedSavedMessage: Message = {
-        ...savedMessage,
-        id: savedMessage._id || savedMessage.id, // Ensure message has id
-        sender: savedMessage.sender
+        // Spread the fields from savedMessageData, not the whole apiResponse
+        id: savedMessageData._id || savedMessageData.id,
+        text: savedMessageData.text || "", // Ensure text exists
+        sender: savedMessageData.sender
           ? {
-              ...savedMessage.sender,
-              id: savedMessage.sender._id || savedMessage.sender.id, // Map sender._id to sender.id
+              // Process the nested sender object
+              ...(savedMessageData.sender as any), // Spread sender fields
+              id: savedMessageData.sender._id || savedMessageData.sender.id, // Map sender ID
             }
-          : user, // Fallback to current user if sender is missing (shouldn't happen ideally)
+          : user, // Fallback to current user if sender is missing
+        timestamp: new Date(
+          savedMessageData.updatedAt || savedMessageData.createdAt || Date.now()
+        ), // Use correct timestamp fields
+        channelId: savedMessageData.channelId || activeChannel.id, // Ensure channelId exists
+        attachments: savedMessageData.attachments || [],
+        reactions: savedMessageData.reactions || [],
+        isEdited: savedMessageData.isEdited || false,
+        replyTo: savedMessageData.replyTo, // Add replyTo if it exists
       };
 
       // 4. Update the temporary message with the processed one from the server
       setMessages((prev) =>
         prev.map((msg) => (msg.id === tempId ? processedSavedMessage : msg))
+      );
+      // Also update the channel's lastMessage with the confirmed message
+      setChannels((prevChannels) =>
+        prevChannels.map((channel) =>
+          channel.id === activeChannel.id
+            ? { ...channel, lastMessage: processedSavedMessage }
+            : channel
+        )
       );
 
       // Socket event will handle updates for other users
@@ -307,6 +352,26 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       console.error("Error sending message:", err);
       // 5. Remove the optimistic message if the API call failed
       setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+      // Revert optimistic channel update on failure
+      setChannels((prevChannels) =>
+        prevChannels.map((channel) => {
+          if (channel.id === activeChannel.id) {
+            // Find the previous last message before the optimistic one
+            // This requires fetching messages again or storing previous state, which is complex.
+            // For simplicity, we might just refetch channels or leave it slightly stale.
+            // Or, if messages state is sorted, take the second to last message.
+            const messagesForChannel = messages.filter(
+              (m) => m.channelId === channel.id && m.id !== tempId
+            );
+            const prevLastMessage =
+              messagesForChannel.length > 0
+                ? messagesForChannel[messagesForChannel.length - 1]
+                : undefined;
+            return { ...channel, lastMessage: prevLastMessage };
+          }
+          return channel;
+        })
+      );
       sonnerToast.error("Failed to send message. Please try again.");
     }
   };
