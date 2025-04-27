@@ -63,65 +63,46 @@ const ChannelItem: React.FC<ChannelItemProps> = React.memo(
       return null;
     }, [channel.members, channel.type, currentUser?.id, propRecipient]);
 
-    let name: string = "";
-
-    if (channel.type === "direct") {
-      if (recipient && recipient.username) {
-        name = recipient.username;
-      } else if (channel.name) {
-        name = channel.name;
-      } else {
-        name = "Unknown User";
-      }
-    } else {
-      name = `#${channel.name || "Unnamed Channel"}`;
-    }
+    let name: string =
+      channel.type === "direct"
+        ? recipient?.username || channel.name || "Unknown User"
+        : `#${channel.name || "Unnamed Channel"}`;
 
     const { lastMsg, lastMessageDate } = useMemo(() => {
       let formattedMsg = "No messages yet";
       let msgDate = null;
+      const lastMessage = channel.lastMessage;
 
-      if (channel.lastMessage) {
-        const messageText =
-          channel.lastMessage.text ||
-          (channel.lastMessage as any).content ||
-          "";
-
-        const messageSender =
-          channel.lastMessage.sender || (channel.lastMessage as any).user;
-
-        let storedUserId = null;
-        try {
-          const storedUser = localStorage.getItem("currentUser");
-          if (storedUser) {
-            const userObj = JSON.parse(storedUser);
-            storedUserId = userObj?.id;
-          }
-        } catch (e) {
-          console.error("Error parsing user from localStorage:", e);
-        }
+      if (lastMessage) {
+        const messageText = lastMessage.text || "";
+        const messageSender = lastMessage.sender;
+        const messageTimestamp = lastMessage.timestamp
+          ? new Date(lastMessage.timestamp)
+          : null;
 
         const isCurrentUserSender =
-          currentUser &&
-          (String(messageSender?.id) === String(currentUser.id) ||
-            messageSender?.username === currentUser.username);
+          currentUser && messageSender && messageSender.id === currentUser.id;
 
-        if (messageSender) {
-          if (isCurrentUserSender) {
-            formattedMsg = `You: ${messageText}`;
-          } else if (channel.type === "direct") {
-            formattedMsg = messageText;
-          } else if (messageSender.username) {
-            formattedMsg = `${messageSender.username}: ${messageText}`;
-          } else {
-            formattedMsg = messageText;
-          }
+        if (messageText) {
+          formattedMsg = isCurrentUserSender
+            ? `You: ${messageText}`
+            : messageText;
+        } else if (
+          lastMessage.attachments &&
+          lastMessage.attachments.length > 0
+        ) {
+          const attachmentType = lastMessage.attachments[0].type || "file";
+          formattedMsg = isCurrentUserSender
+            ? `You sent an ${attachmentType}`
+            : `${
+                recipient?.username || messageSender?.username || "Someone"
+              } sent an ${attachmentType}`;
         } else {
-          formattedMsg = messageText;
+          formattedMsg = "Empty message";
         }
 
-        if (channel.lastMessage.timestamp) {
-          msgDate = format(new Date(channel.lastMessage.timestamp), "h:mm a");
+        if (messageTimestamp) {
+          msgDate = format(messageTimestamp, "h:mm a");
         }
       }
 
@@ -129,13 +110,7 @@ const ChannelItem: React.FC<ChannelItemProps> = React.memo(
         lastMsg: formattedMsg,
         lastMessageDate: msgDate,
       };
-    }, [
-      channel.lastMessage,
-      currentUser,
-      channel.type,
-      channel.id,
-      channel.name,
-    ]);
+    }, [channel.lastMessage, currentUser?.id]);
 
     return (
       <div
@@ -154,7 +129,10 @@ const ChannelItem: React.FC<ChannelItemProps> = React.memo(
         )}
         <div className="flex flex-col truncate flex-1">
           <span className="truncate font-medium text-left">{name}</span>
-          <span className="text-xs text-muted-foreground truncate text-left w-full">
+          <span
+            className="text-xs text-muted-foreground truncate text-left w-full"
+            title={lastMsg}
+          >
             {lastMsg}
           </span>
         </div>
