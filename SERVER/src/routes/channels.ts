@@ -12,6 +12,7 @@ import { protect } from "../middleware/auth";
 import { createHandler } from "../utils/routeHandler";
 import { Channel } from "../models/Channel";
 import { User } from "../models/User";
+import { Message } from "../models/Message";
 
 const router = express.Router();
 
@@ -88,14 +89,54 @@ router.get("/", async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    // Find channels where the user is a member
-    const channels = await Channel.find({
+    // 1. Find channels, populate members, get plain objects
+    const channelsData = await Channel.find({
       "members.userId": userId,
-    }).populate("members.userId");
+    })
+      .populate("members.userId")
+      .lean(); // Use lean()
+
+    // 2. Extract lastMessage IDs
+    const messageIds = channelsData
+      .map((ch) => ch.lastMessage)
+      .filter((id) => id); // Filter out null/undefined IDs
+
+    // 3. Fetch and populate the relevant last messages separately
+    const lastMessages = await Message.find({ _id: { $in: messageIds } })
+      .populate("sender") // Populate sender for these messages
+      .lean(); // Use lean()
+
+    // 4. Create a map for quick lookup
+    const lastMessageMap = new Map(
+      lastMessages.map((msg) => [msg._id.toString(), msg])
+    );
+
+    // 5. Attach the populated lastMessage back to each channel
+    const finalChannels = channelsData.map((channel) => {
+      // Ensure lastMessage is an object ID before converting to string
+      const lastMsgId = channel.lastMessage
+        ? channel.lastMessage.toString()
+        : null;
+      const populatedLastMessage = lastMsgId
+        ? lastMessageMap.get(lastMsgId) || null
+        : null;
+      return {
+        ...channel,
+        // Convert mongoose docs back if needed, or adjust client handling
+        lastMessage: populatedLastMessage,
+      };
+    });
+
+    // --- DEBUG: Log final channels ---
+    console.log(
+      "[GET /channels] Final channels data (manual populate):",
+      JSON.stringify(finalChannels, null, 2)
+    );
+    // --- END DEBUG ---
 
     return res.status(200).json({
       message: "Channels retrieved successfully",
-      data: channels,
+      data: finalChannels, // Send the manually processed data
     });
   } catch (error: any) {
     return res.status(500).json({
