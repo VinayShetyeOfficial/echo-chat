@@ -431,9 +431,9 @@ export const getChannels = async (): Promise<Channel[]> => {
         }
 
         lastMessage = {
-          id: channel.lastMessage.id,
+          id: channel.lastMessage._id || channel.lastMessage.id, // Map _id or id
           text: messageText,
-          sender: messageSender,
+          sender: messageSender, // Ensure sender is User object
           timestamp: new Date(channel.lastMessage.createdAt || Date.now()),
           channelId: channel.lastMessage.channelId,
           attachments: channel.lastMessage.attachments || [],
@@ -443,8 +443,10 @@ export const getChannels = async (): Promise<Channel[]> => {
         };
       }
 
+      // Map _id to id for the main channel object
       return {
         ...channel,
+        id: channel._id || channel.id, // Ensure 'id' property exists
         members: processedMembers, // Use the processed members
         lastMessage: lastMessage,
       };
@@ -688,18 +690,26 @@ export const updateMessage = async (
   content: string
 ): Promise<Message> => {
   try {
-    const response = await apiClient.put(`/messages/${messageId}`, { content });
+    // Send { text: ... } in the body to match server expectation
+    const response = await apiClient.put(`/messages/${messageId}`, {
+      text: content,
+    });
 
     // Transform server response to client format
     const serverMessage = response.data.data;
 
     // Map from server format to client format
     const clientMessage: Message = {
-      id: serverMessage.id,
-      text: serverMessage.content, // Map 'content' to 'text'
-      sender: serverMessage.user, // Map 'user' to 'sender'
+      id: serverMessage._id || serverMessage.id, // Map _id or id
+      text: serverMessage.text, // Use 'text' from server response
+      sender: serverMessage.sender // Server sends populated sender
+        ? {
+            ...serverMessage.sender,
+            id: serverMessage.sender._id || serverMessage.sender.id, // Ensure sender has 'id'
+          }
+        : null, // Handle null sender if necessary
       timestamp: new Date(
-        serverMessage.createdAt || serverMessage.updatedAt || Date.now()
+        serverMessage.updatedAt || serverMessage.createdAt || Date.now()
       ),
       channelId: serverMessage.channelId,
       attachments: serverMessage.attachments || [],
