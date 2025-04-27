@@ -46,10 +46,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     if (token && storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        // Ensure the user object uses 'id'
+        const processedUser = {
+          ...parsedUser,
+          id: parsedUser.id || parsedUser._id, // Map _id to id if id doesn't exist
+          _id: undefined, // Optionally remove _id
+        };
+        setUser(processedUser);
         setAuthenticated(true);
       } catch (err) {
         console.error("Error parsing stored user:", err);
+        // Clear invalid stored data
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        localStorage.removeItem("currentUser");
       }
     }
 
@@ -62,12 +73,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       // Don't set loading here - Auth.tsx is managing loading state
       const data = await authApi.login(email, password);
 
+      // Ensure the user object uses 'id'
+      const processedUser = {
+        ...data.user,
+        id: data.user.id || data.user._id, // Map _id to id
+        _id: undefined, // Optionally remove _id
+      };
+
       // Store user data and token
       localStorage.setItem("token", data.token);
-      localStorage.setItem("currentUser", JSON.stringify(data.user));
+      localStorage.setItem("currentUser", JSON.stringify(processedUser));
 
       // Update auth state
-      setUser(data.user);
+      setUser(processedUser);
       setAuthenticated(true);
 
       return true;
