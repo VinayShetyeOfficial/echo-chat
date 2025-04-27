@@ -104,9 +104,12 @@ router.post("/", (req: Request, res: Response) => {
 
       await message.save();
 
-      // Update channel's lastMessage
-      channel.lastMessage = message._id;
-      await channel.save();
+      // Update channel's lastMessage using findByIdAndUpdate
+      await Channel.findByIdAndUpdate(channelId, {
+        lastMessage: message._id,
+        // Optionally update the channel's updatedAt timestamp as well
+        updatedAt: new Date(),
+      });
 
       // Populate sender info for response
       await message.populate("sender");
@@ -130,6 +133,7 @@ router.post("/", (req: Request, res: Response) => {
 });
 
 // --- TEST GET ROUTE FOR /:messageId START ---
+/*
 router.get("/:messageId", protect, async (req: Request, res: Response) => {
   const { messageId } = req.params;
   const userId = req.user?.id;
@@ -148,6 +152,7 @@ router.get("/:messageId", protect, async (req: Request, res: Response) => {
       .json({ message: "Test GET route error", error: error.message });
   }
 });
+*/
 // --- TEST GET ROUTE FOR /:messageId END ---
 
 // --- ADD PUT ROUTE FOR UPDATING MESSAGE START ---
