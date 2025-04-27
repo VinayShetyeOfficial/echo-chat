@@ -420,7 +420,7 @@ export function ChatSidebar({
         {/* Add user profile footer */}
         <div className="mt-auto border-t p-4">
           <div className="flex items-center gap-3">
-            <UserAvatar user={user} />
+            <UserAvatar user={user} showStatus={true} />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate text-left">
                 {user?.username || "Unknown User"}
