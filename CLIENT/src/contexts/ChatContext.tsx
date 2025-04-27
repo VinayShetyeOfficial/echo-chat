@@ -41,6 +41,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentlyEditingId, setCurrentlyEditingId] = useState<string | null>(
+    null
+  );
 
   const { user } = useAuth();
 
@@ -57,18 +60,44 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       try {
         setLoading(true);
         const userChannels = await getChannels();
-        const channelsWithUnread = userChannels.map((ch) => ({
-          ...ch,
-          unreadCount: 0,
-        }));
+
+        const channelsWithUnread = Array.isArray(userChannels)
+          ? userChannels.map((ch) => ({
+              ...ch,
+              unreadCount: 0,
+            }))
+          : [];
+
         setChannels(channelsWithUnread);
 
-        if (channelsWithUnread.length > 0 && !activeChannel) {
-          const initialChannel = channelsWithUnread[0];
-          setActiveChannel(initialChannel);
-          await fetchMessages(initialChannel.id);
-        } else if (channelsWithUnread.length === 0) {
-          // New user with no channels
+        if (channelsWithUnread.length > 0) {
+          const currentActiveChannelIsValid =
+            activeChannel &&
+            channelsWithUnread.some((ch) => ch.id === activeChannel.id);
+
+          if (!currentActiveChannelIsValid) {
+            const initialChannel = channelsWithUnread[0];
+            console.log(
+              "[fetchChannels] Setting initial active channel:",
+              initialChannel
+            );
+            if (initialChannel && initialChannel.id) {
+              setActiveChannel(initialChannel);
+              await fetchMessages(initialChannel.id);
+            } else {
+              console.error(
+                "[fetchChannels] Error: Initial channel or its ID is missing!",
+                initialChannel
+              );
+              setActiveChannel(null);
+              setMessages([]);
+            }
+          } else {
+            console.log(
+              "[fetchChannels] Current active channel is still valid."
+            );
+          }
+        } else {
           console.log(
             "No channels found for user. Create a new channel or start a direct message."
           );
@@ -77,10 +106,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       } catch (error) {
         console.error("Error fetching channels:", error);
-        // Don't show error toast for new users with no channels
         if (error instanceof Error && !error.message.includes("No channels")) {
           sonnerToast.error("Error fetching channels");
         }
+        setActiveChannel(null);
+        setMessages([]);
       } finally {
         setLoading(false);
       }
@@ -118,29 +148,56 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [user]);
 
   useEffect(() => {
-    if (socket && activeChannel) {
-      // Leave previous channel if any
-      socket.emit("leave_channel", { channelId: activeChannel.id });
+    if (!socket) return;
 
-      // Join new channel
-      socket.emit("join_channel", { channelId: activeChannel.id });
+    // Listener function for new messages
+    const handleNewMessage = (rawMessage: any) => {
+      // Map _id to id for consistency
+      const message: Message = {
+        ...rawMessage,
+        id: rawMessage._id, // Map _id to id
+        sender: rawMessage.sender
+          ? {
+              ...rawMessage.sender,
+              id: rawMessage.sender._id, // Map sender._id to sender.id
+            }
+          : undefined,
+      };
 
-      // Load messages for this channel
-      fetchMessages(activeChannel.id);
-
-      // Listen for new messages
-      socket.on("new_message", (message: Message) => {
+      // Check if the message belongs to the currently active channel
+      if (message.channelId === activeChannel?.id) {
         setMessages((prev) => [...prev, message]);
-      });
-    }
-
-    return () => {
-      // Remove event listeners
-      if (socket) {
-        socket.off("new_message");
+      } else {
+        // Optionally: handle notifications for messages in other channels
+        console.log(
+          `Received message for inactive channel ${message.channelId}`
+        );
+        // You could update unread counts here
       }
     };
-  }, [socket, activeChannel]);
+
+    // Set up the listener
+    socket.on("new_message", handleNewMessage);
+    console.log(`Socket listener for 'new_message' attached.`);
+
+    // Join the active channel room if available
+    if (activeChannel && activeChannel.id) {
+      console.log(`Emitting join_channel for ${activeChannel.id}`);
+      socket.emit("join_channel", { channelId: activeChannel.id });
+    }
+
+    // Cleanup function
+    return () => {
+      console.log(`Cleaning up socket listener for 'new_message'.`);
+      socket.off("new_message", handleNewMessage);
+
+      // Leave the channel room when the component unmounts or activeChannel changes
+      if (activeChannel && activeChannel.id) {
+        console.log(`Emitting leave_channel for ${activeChannel.id}`);
+        socket.emit("leave_channel", { channelId: activeChannel.id });
+      }
+    };
+  }, [socket, activeChannel]); // Re-run this effect when socket or activeChannel changes
 
   const fetchMessages = async (channelId: string) => {
     // Skip if no channelId is provided
@@ -156,7 +213,20 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       setError(null);
 
       const response = await messageApi.getMessages(channelId);
-      setMessages(response.data || []);
+
+      // Process messages to ensure ID mapping
+      const processedMessages = (response.data || []).map((msg: any) => ({
+        ...msg,
+        id: msg._id || msg.id,
+        sender: msg.sender
+          ? {
+              ...msg.sender,
+              id: msg.sender._id || msg.sender.id,
+            }
+          : null, // Handle cases where sender might be null
+      }));
+
+      setMessages(processedMessages);
     } catch (err: any) {
       setError(err.message || "Failed to fetch messages");
       console.error("Error fetching messages:", err);
@@ -176,20 +246,68 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   const sendMessage = async (content: string, attachments: File[] = []) => {
     if (!activeChannel || !user) return;
 
+    // 1. Create a temporary message object for optimistic update
+    const tempId = `temp-${Date.now()}-${Math.random()}`;
+    const optimisticMessage: Message = {
+      id: tempId, // Temporary ID
+      text: content,
+      sender: user, // Use the current logged-in user as the sender
+      timestamp: new Date(),
+      channelId: activeChannel.id,
+      attachments: [], // Handle attachments properly if needed
+      reactions: [],
+      isEdited: false,
+    };
+
+    // 2. Optimistically update the UI
+    setMessages((prev) => [...prev, optimisticMessage]);
+
     try {
       const messageData = {
         text: content,
         channelId: activeChannel.id,
-        attachments: [],
+        attachments: [], // Send attachment data if implementing uploads
       };
 
-      // Send via API
-      await messageApi.sendMessage(messageData);
+      // DEBUG: Log the data being sent
+      console.log("[sendMessage] Sending data:", messageData);
+      if (!messageData.channelId) {
+        console.error("[sendMessage] Error: channelId is missing!");
+        throw new Error("Cannot send message: Channel ID is missing.");
+      }
+      if (!messageData.text) {
+        console.error("[sendMessage] Error: Message text is missing!");
+        throw new Error("Cannot send message: Message text is missing.");
+      }
 
-      // Socket will handle adding the message to the UI via the 'new_message' event
+      // 3. Send via API
+      const savedMessage = await messageApi.sendMessage(messageData);
+
+      // Process the saved message to ensure ID mapping
+      const processedSavedMessage: Message = {
+        ...savedMessage,
+        id: savedMessage._id || savedMessage.id, // Ensure message has id
+        sender: savedMessage.sender
+          ? {
+              ...savedMessage.sender,
+              id: savedMessage.sender._id || savedMessage.sender.id, // Map sender._id to sender.id
+            }
+          : user, // Fallback to current user if sender is missing (shouldn't happen ideally)
+      };
+
+      // 4. Update the temporary message with the processed one from the server
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === tempId ? processedSavedMessage : msg))
+      );
+
+      // Socket event will handle updates for other users
+      // and potentially sync if needed, but sender sees message immediately
     } catch (err: any) {
       setError(err.message || "Failed to send message");
       console.error("Error sending message:", err);
+      // 5. Remove the optimistic message if the API call failed
+      setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+      sonnerToast.error("Failed to send message. Please try again.");
     }
   };
 
@@ -390,8 +508,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
     deleteMessage,
     reactToMessage,
     createChannel,
-    currentlyEditingId: null,
-    setCurrentlyEditingId: () => {},
+    currentlyEditingId,
+    setCurrentlyEditingId,
   };
 
   return (
