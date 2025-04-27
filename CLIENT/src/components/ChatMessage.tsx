@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { UserAvatar } from "./UserAvatar";
 import { format, formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -316,6 +316,7 @@ export function ChatMessage({ message, onReply }: ChatMessageProps) {
   const emojiButtonRef = useRef<HTMLButtonElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const isCurrentUser = message.sender?.id === user?.id;
+  const [isHovering, setIsHovering] = useState(false);
 
   // Determine if message is long (over 300 characters or has more than 4 lines)
   const messageContent = message.text || "";
@@ -662,6 +663,7 @@ export function ChatMessage({ message, onReply }: ChatMessageProps) {
             )}
           </div>
 
+          {/* Message Content Area */}
           {isEditing ? (
             <div className="w-full bg-gray-900/90 p-3 rounded-lg border border-purple-600/50 shadow-lg">
               <div className="flex justify-between mb-2">
@@ -781,6 +783,7 @@ export function ChatMessage({ message, onReply }: ChatMessageProps) {
             </div>
           )}
 
+          {/* INSERT ORIGINAL HOVER ACTIONS BLOCK START */}
           {!isEditing && (
             <div
               className={cn(
@@ -893,6 +896,7 @@ export function ChatMessage({ message, onReply }: ChatMessageProps) {
               </div>
             </div>
           )}
+          {/* INSERT ORIGINAL HOVER ACTIONS BLOCK END */}
         </div>
       </div>
     </div>
