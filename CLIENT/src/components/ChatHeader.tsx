@@ -114,6 +114,7 @@ export function ChatHeader({ onToggleSidebar }: ChatHeaderProps) {
       </div>
 
       {/* --- TEST BUTTON START --- */}
+      {/*
       <Button
         variant="outline"
         size="sm"
@@ -155,6 +156,7 @@ export function ChatHeader({ onToggleSidebar }: ChatHeaderProps) {
       >
         Test GET Message Route
       </Button>
+      */}
       {/* --- TEST BUTTON END --- */}
 
       <SettingsDialog
