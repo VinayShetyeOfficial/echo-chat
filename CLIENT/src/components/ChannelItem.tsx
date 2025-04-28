@@ -152,7 +152,7 @@ const ChannelItem: React.FC<ChannelItemProps> = React.memo(
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 w-7 p-0 ml-1 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                className="h-7 w-7 p-0 ml-1 hover:bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
                 onClick={(e) => e.stopPropagation()}
               >
                 <MoreVertical className="h-4 w-4 text-muted-foreground" />
