@@ -215,4 +215,81 @@ router.put("/:messageId", protect, async (req: Request, res: Response) => {
 });
 // --- ADD PUT ROUTE FOR UPDATING MESSAGE END ---
 
+// --- ADD POST ROUTE FOR ADDING/TOGGLING REACTION START ---
+router.post("/:messageId/reactions", async (req: Request, res: Response) => {
+  const { messageId } = req.params;
+  const { emoji } = req.body; // Expecting emoji in the request body
+  const userId = req.user?.id;
+
+  if (!userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  if (!emoji) {
+    return res.status(400).json({ message: "Emoji is required" });
+  }
+
+  try {
+    const message = await Message.findById(messageId);
+
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    const reactionIndex = message.reactions.findIndex((r) => r.emoji === emoji);
+
+    if (reactionIndex > -1) {
+      // Reaction emoji exists
+      const userIndex = message.reactions[reactionIndex].users.findIndex(
+        (userReactedId) => userReactedId.toString() === userId
+      );
+
+      if (userIndex > -1) {
+        // User has reacted with this emoji, remove the reaction (toggle off)
+        message.reactions[reactionIndex].users.splice(userIndex, 1);
+        // If no users left for this emoji, remove the emoji reaction entirely
+        if (message.reactions[reactionIndex].users.length === 0) {
+          message.reactions.splice(reactionIndex, 1);
+        }
+      } else {
+        // User has not reacted with this emoji, add user to the list
+        message.reactions[reactionIndex].users.push(userId as any);
+      }
+    } else {
+      // Reaction emoji does not exist, add new reaction
+      message.reactions.push({ emoji, users: [userId as any] });
+    }
+
+    // Update the message document
+    message.updatedAt = new Date();
+    await message.save();
+
+    // Populate sender for the response/event
+    await message.populate("sender");
+    // Populate reaction users if needed (optional, can increase payload size)
+    // await message.populate("reactions.users");
+
+    // Emit update event via WebSocket
+    if (req.app.get("io")) {
+      req.app
+        .get("io")
+        .to(message.channelId.toString())
+        // Use message_updated, assuming client handles this for general updates
+        .emit("message_updated", message);
+    }
+
+    return res.status(200).json({
+      message: "Reaction updated successfully",
+      data: message.reactions, // Send back updated reactions or the whole message
+    });
+  } catch (error: any) {
+    console.error("Update reaction error:", error);
+    return res.status(500).json({
+      message: "Error updating reaction",
+      error: error.message,
+    });
+  }
+});
+// --- ADD POST ROUTE FOR ADDING/TOGGLING REACTION END ---
+
 export default router;
