@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { User, Channel, Message } from "../types";
+import type { User, Channel, Message, Reaction } from "../types";
 import { getCurrentUser } from "@/lib/auth";
 
 // Update the API URL to ensure it's correctly formatted
@@ -160,13 +160,39 @@ export const channelApi = {
 
 // Messages API
 export const messageApi = {
-  getMessages: (channelId: string) => {
+  getMessages: async (channelId: string) => {
     // Handle undefined channelId gracefully
     if (!channelId) {
       console.log("No channel ID provided for message fetch");
       return Promise.resolve({ data: [] });
     }
-    return fetchApi(`/messages?channelId=${channelId}`);
+
+    try {
+      const response = await fetchApi(`/messages?channelId=${channelId}`);
+
+      // Process reaction counts in each message
+      if (response.data && Array.isArray(response.data)) {
+        response.data = response.data.map((message: any) => {
+          // Ensure reactions have proper count values
+          if (message.reactions && Array.isArray(message.reactions)) {
+            message.reactions = message.reactions.map((reaction: any) => {
+              const users = Array.isArray(reaction.users) ? reaction.users : [];
+              return {
+                ...reaction,
+                // Always set count based on users array length
+                count: users.length,
+              };
+            });
+          }
+          return message;
+        });
+      }
+
+      return response;
+    } catch (error) {
+      console.error("Error fetching messages for channel:", channelId, error);
+      return { data: [] };
+    }
   },
   sendMessage: (data: any) =>
     fetchApi("/messages", {
@@ -759,43 +785,37 @@ export const deleteMessage = async (messageId: string): Promise<boolean> => {
   }
 };
 
-export const addReaction = async (
-  messageId: string,
-  userId: string,
-  emoji: string
-): Promise<void> => {
-  try {
-    await apiClient.post(`/messages/${messageId}/reactions`, { userId, emoji });
-  } catch (error) {
-    console.error("Add reaction error:", error);
-    throw error;
-  }
-};
-
-export const removeReaction = async (
-  messageId: string,
-  userId: string,
-  emoji: string
-): Promise<void> => {
-  try {
-    await apiClient.delete(
-      `/messages/${messageId}/reactions/${emoji}?userId=${userId}`
-    );
-  } catch (error) {
-    console.error("Remove reaction error:", error);
-    throw error;
-  }
-};
-
 export const reactToMessage = async (
   messageId: string,
   emoji: string
-): Promise<{ messageId: string; reaction: any }> => {
+): Promise<{ messageId: string; reactions: Reaction[] }> => {
+  // No need to get userId here, server uses the authenticated user
   try {
     const response = await apiClient.post(`/messages/${messageId}/reactions`, {
-      emoji,
+      emoji, // Send the emoji in the body
     });
-    return response.data.data;
+
+    // Process and normalize reactions with counts
+    const reactions = (response.data.data || []).map((r: any) => ({
+      ...r,
+      emoji: r.emoji,
+      // Explicitly calculate count based on users array length
+      count: Array.isArray(r.users) ? r.users.length : 0,
+      users: Array.isArray(r.users)
+        ? r.users.map((u: any) => u?.toString())
+        : [],
+    }));
+
+    console.log(
+      `[api.reactToMessage] Processed reactions:`,
+      reactions.map((r: any) => ({
+        emoji: r.emoji,
+        count: r.count,
+        users: r.users.length,
+      }))
+    );
+
+    return { messageId, reactions };
   } catch (error) {
     console.error("React to message error:", error);
     throw error;
@@ -965,6 +985,19 @@ const transformApiMessages = (messages: any[]): Message[] => {
       console.warn("Empty message content detected in message:", msg.id);
     }
 
+    // Process reactions to ensure counts are properly calculated
+    const processedReactions = (msg.reactions || []).map((r: any) => {
+      // Ensure users array is valid
+      const users = Array.isArray(r.users) ? r.users : [];
+      return {
+        ...r,
+        emoji: r.emoji,
+        // Always calculate count from users array length
+        count: users.length,
+        users: users.map((u: any) => u?.toString()),
+      };
+    });
+
     return {
       id: msg.id,
       text: messageContent,
@@ -972,7 +1005,7 @@ const transformApiMessages = (messages: any[]): Message[] => {
       timestamp: ensureValidDate(msg.createdAt || msg.timestamp),
       channelId: msg.channelId,
       attachments: msg.attachments || [],
-      reactions: msg.reactions || [],
+      reactions: processedReactions,
       isEdited: msg.isEdited || false,
       replyTo: msg.replyTo,
     };
