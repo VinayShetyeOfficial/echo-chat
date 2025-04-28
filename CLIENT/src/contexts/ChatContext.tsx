@@ -22,8 +22,7 @@ import {
   sendMessage as apiSendMessage,
   updateMessage as apiUpdateMessage,
   deleteMessage as apiDeleteMessage,
-  addReaction,
-  removeReaction,
+  reactToMessage as apiReactToMessage,
   createChannel as apiCreateChannel,
 } from "@/lib/api";
 import { getToken } from "@/lib/auth";
@@ -163,9 +162,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
             }
           : undefined,
         // Ensure timestamp is a Date object
-        timestamp: rawMessage.timestamp
-          ? new Date(rawMessage.timestamp)
+        timestamp: rawMessage.createdAt // Use createdAt from server
+          ? new Date(rawMessage.createdAt)
           : new Date(),
+        // Calculate reaction counts from users array length
+        reactions: (rawMessage.reactions || []).map((r: any) => ({
+          ...r,
+          count: r.users?.length || 0,
+        })),
       };
 
       // Update message list if it belongs to the active channel
@@ -191,9 +195,82 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     };
 
-    // Set up the listener
+    // Listener function for updated messages (e.g., reactions, edits)
+    const handleMessageUpdated = (rawMessage: any) => {
+      console.log("[Socket] Received message_updated:", rawMessage);
+
+      // Extract and log reaction data for debugging
+      if (rawMessage.reactions && rawMessage.reactions.length > 0) {
+        console.log(
+          "[Socket] Raw reaction data received:",
+          JSON.stringify(rawMessage.reactions, null, 2)
+        );
+      }
+
+      // Calculate reaction counts based on users array length
+      const processedReactions = (rawMessage.reactions || []).map((r: any) => {
+        // Always normalize users to an array
+        const users = Array.isArray(r.users) ? r.users : [];
+        // Set count based on users length
+        return {
+          ...r,
+          emoji: r.emoji,
+          users: users.map((u: any) => u?.toString() || u),
+          // IMPORTANT: Always calculate count based on users array length
+          count: users.length,
+        };
+      });
+
+      console.log(
+        "[Socket] Processed reactions with counts:",
+        processedReactions.map((r) => ({ emoji: r.emoji, count: r.count }))
+      );
+
+      const updatedMessage: Message = {
+        ...rawMessage,
+        id: rawMessage._id || rawMessage.id,
+        sender: rawMessage.sender
+          ? {
+              ...rawMessage.sender,
+              id: rawMessage.sender._id || rawMessage.sender.id,
+            }
+          : undefined,
+        timestamp: rawMessage.createdAt
+          ? new Date(rawMessage.createdAt)
+          : new Date(),
+        reactions: processedReactions, // Use our processed reactions
+      };
+
+      // Update the specific message in the list
+      setMessages((prev) =>
+        prev.map((m) => (m.id === updatedMessage.id ? updatedMessage : m))
+      );
+
+      // Also update lastMessage in the channel list if this is the latest message
+      setChannels((prevChannels) =>
+        prevChannels.map((channel) => {
+          if (channel.id === updatedMessage.channelId) {
+            // Check if this updated message is newer than the current lastMessage
+            const currentLastMessageTimestamp = channel.lastMessage?.timestamp
+              ? new Date(channel.lastMessage.timestamp).getTime()
+              : 0;
+            const updatedMessageTimestamp = updatedMessage.timestamp.getTime();
+
+            if (updatedMessageTimestamp >= currentLastMessageTimestamp) {
+              return { ...channel, lastMessage: updatedMessage };
+            }
+          }
+          return channel;
+        })
+      );
+    };
+
+    // Set up the listeners
     socket.on("new_message", handleNewMessage);
-    console.log(`Socket listener for 'new_message' attached.`);
+    socket.on("message_updated", handleMessageUpdated); // Add listener for updates
+    console.log(
+      `Socket listeners for 'new_message' and 'message_updated' attached.`
+    );
 
     // Join the active channel room if available
     if (activeChannel && activeChannel.id) {
@@ -203,8 +280,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // Cleanup function
     return () => {
-      console.log(`Cleaning up socket listener for 'new_message'.`);
+      console.log(
+        `Cleaning up socket listeners for 'new_message' and 'message_updated'.`
+      );
       socket.off("new_message", handleNewMessage);
+      socket.off("message_updated", handleMessageUpdated); // Remove listener for updates
 
       // Leave the channel room when the component unmounts or activeChannel changes
       if (activeChannel && activeChannel.id) {
@@ -229,20 +309,50 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
 
       const response = await messageApi.getMessages(channelId);
 
+      console.log("[fetchMessages] Raw messages from API:", response.data);
+
       // Process messages to ensure ID mapping AND correct timestamp
-      const processedMessages = (response.data || []).map((msg: any) => ({
-        ...msg,
-        id: msg._id || msg.id,
-        sender: msg.sender
-          ? {
-              // Process sender
-              ...msg.sender,
-              id: msg.sender._id || msg.sender.id,
-            }
-          : null, // Handle cases where sender might be null
-        // Ensure timestamp is a Date object, using createdAt as primary source
-        timestamp: msg.createdAt ? new Date(msg.createdAt) : new Date(),
-      }));
+      const processedMessages = (response.data || []).map((msg: any) => {
+        // Process reactions to ensure counts are properly set
+        const processedReactions = (msg.reactions || []).map((r: any) => {
+          // Ensure users array is valid
+          const users = Array.isArray(r.users) ? r.users : [];
+          return {
+            ...r,
+            emoji: r.emoji,
+            // Always set count based on users array length
+            count: users.length,
+            users: users.map((u: any) => u?.toString()),
+          };
+        });
+
+        return {
+          ...msg,
+          id: msg._id || msg.id,
+          sender: msg.sender
+            ? {
+                // Process sender
+                ...msg.sender,
+                id: msg.sender._id || msg.sender.id,
+              }
+            : null, // Handle cases where sender might be null
+          // Ensure timestamp is a Date object, using createdAt as primary source
+          timestamp: msg.createdAt ? new Date(msg.createdAt) : new Date(),
+          // Use processed reactions with counts
+          reactions: processedReactions,
+        };
+      });
+
+      console.log(
+        "[fetchMessages] Processed messages with reaction counts:",
+        processedMessages.map((m) => ({
+          id: m.id,
+          reactions: m.reactions.map((r) => ({
+            emoji: r.emoji,
+            count: r.count,
+          })),
+        }))
+      );
 
       setMessages(processedMessages);
     } catch (err: any) {
@@ -421,55 +531,103 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const reactToMessage = async (messageId: string, emoji: string) => {
-    if (!user) return;
-    const msg = messages.find((m) => m.id === messageId);
-    if (!msg) return;
+    if (!user || !activeChannel) return;
+    const originalMessages = [...messages]; // Store original state for potential revert
 
-    const userReacted = msg.reactions?.some(
-      (r) => r.emoji === emoji && r.users.includes(user.id)
+    console.log(
+      `[reactToMessage] Reacting to message ${messageId} with emoji ${emoji}`
     );
 
+    // Optimistic update
     setMessages((prev) =>
       prev.map((m) => {
         if (m.id !== messageId) return m;
-        const updated = { ...m };
-        const reactionsCopy = [...(updated.reactions || [])];
-        if (userReacted) {
-          updated.reactions = reactionsCopy
-            .map((r) =>
-              r.emoji === emoji
-                ? {
-                    ...r,
-                    count: r.count - 1,
-                    users: r.users.filter((u) => u !== user.id),
-                  }
-                : r
-            )
-            .filter((r) => r.count > 0);
-        } else {
-          const existing = reactionsCopy.find((r) => r.emoji === emoji);
-          if (existing) {
-            existing.count += 1;
-            existing.users.push(user.id);
+        const updatedReactions = [...(m.reactions || [])];
+        const reactionIndex = updatedReactions.findIndex(
+          (r) => r.emoji === emoji
+        );
+        const userIdString = user.id; // Ensure we use the string ID
+
+        if (reactionIndex > -1) {
+          // Emoji exists
+          const userIndex = updatedReactions[reactionIndex].users.findIndex(
+            (id) => id === userIdString
+          );
+          if (userIndex > -1) {
+            // User reacted, remove user (toggle off)
+            updatedReactions[reactionIndex].users.splice(userIndex, 1);
+            // Remove reaction if no users left
+            if (updatedReactions[reactionIndex].users.length === 0) {
+              updatedReactions.splice(reactionIndex, 1);
+            }
           } else {
-            reactionsCopy.push({ emoji, count: 1, users: [user.id] });
+            // User hasn't reacted, add user
+            updatedReactions[reactionIndex].users.push(userIdString);
           }
-          updated.reactions = reactionsCopy;
+        } else {
+          // Emoji doesn't exist, add new reaction
+          updatedReactions.push({ emoji, count: 1, users: [userIdString] });
         }
-        return updated;
+        // Update/ensure count based on users array length
+        updatedReactions.forEach((r) => {
+          r.count = r.users.length;
+        });
+
+        console.log(
+          `[reactToMessage] Optimistic update reactions:`,
+          updatedReactions.map((r) => ({ emoji: r.emoji, count: r.count }))
+        );
+        return { ...m, reactions: updatedReactions };
       })
     );
 
     try {
-      if (userReacted) {
-        await removeReaction(messageId, user.id, emoji);
-      } else {
-        await addReaction(messageId, user.id, emoji);
-      }
+      // Call the updated API function
+      const { reactions: updatedServerReactions } = await apiReactToMessage(
+        messageId,
+        emoji
+      );
+
+      console.log(
+        `[reactToMessage] Server returned reactions:`,
+        updatedServerReactions
+      );
+
+      // Ensure each reaction has a correct count based on users array
+      const processedReactions = updatedServerReactions.map((r) => {
+        // Make sure we have a valid users array
+        const users = Array.isArray(r.users) ? r.users : [];
+        // Calculate count based on users array length
+        const count = users.length;
+
+        return {
+          ...r,
+          count: count,
+          users: users.map((u) => u?.toString() || u), // Ensure all user IDs are strings
+        };
+      });
+
+      console.log(
+        `[reactToMessage] Processed server reactions:`,
+        processedReactions.map((r) => ({ emoji: r.emoji, count: r.count }))
+      );
+
+      // Update state with server response (more robust than relying purely on optimistic)
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? {
+                ...m,
+                reactions: processedReactions,
+              } // Use processed server data
+            : m
+        )
+      );
     } catch (err) {
-      console.error("React to message error:", err);
+      console.error("React to message error in context:", err);
       sonnerToast.error("Failed to update reaction");
-      await fetchMessages(activeChannel.id);
+      // Revert optimistic update on error
+      setMessages(originalMessages);
     }
   };
 
