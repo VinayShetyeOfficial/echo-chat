@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { UserAvatar } from "./UserAvatar";
-import { format, formatDistanceToNow } from "date-fns";
+import {
+  format,
+  formatDistanceToNow,
+  isToday,
+  isYesterday,
+  differenceInMinutes,
+} from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -38,6 +44,24 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { Message, User, Attachment, Reaction } from "../types";
+
+// Define ensureValidDate helper function here
+const ensureValidDate = (dateInput: any): Date => {
+  if (!dateInput) return new Date();
+
+  try {
+    const date = new Date(dateInput);
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.warn("Invalid date detected in ChatMessage:", dateInput);
+      return new Date(); // Return current date as fallback
+    }
+    return date;
+  } catch (e) {
+    console.warn("Error parsing date in ChatMessage:", e);
+    return new Date(); // Return current date as fallback
+  }
+};
 
 interface ChatMessageProps {
   message: Message;
@@ -493,27 +517,47 @@ export function ChatMessage({ message, onReply }: ChatMessageProps) {
     return reaction ? reaction.users.includes(user?.id || "") : false;
   };
 
-  // Format time for display
-  const ensureValidDate = (dateInput: any) => {
-    if (!dateInput) return new Date();
-
-    try {
-      const date = new Date(dateInput);
-      // Check if date is valid
-      if (isNaN(date.getTime())) {
-        console.warn("Invalid date detected:", dateInput);
-        return new Date(); // Return current date as fallback
-      }
-      return date;
-    } catch (e) {
-      console.warn("Error parsing date:", e);
-      return new Date(); // Return current date as fallback
-    }
-  };
-
+  // Calculate messageDate directly on each render
   const messageDate = ensureValidDate(message.timestamp);
-  const timeAgo = formatDistanceToNow(messageDate, { addSuffix: true });
-  const formattedDate = format(messageDate, "PPp");
+  const [displayTime, setDisplayTime] = useState(() =>
+    getFormattedTimestamp(messageDate)
+  );
+
+  // Helper function to format timestamp based on age
+  function getFormattedTimestamp(date: Date): string {
+    const now = new Date();
+    const minutesAgo = differenceInMinutes(now, date);
+
+    if (minutesAgo < 1) {
+      return "just now";
+    }
+    if (minutesAgo < 60) {
+      // formatDistanceToNow doesn't update automatically, so calculate manually for < 1 hr
+      return `${minutesAgo} minute${minutesAgo > 1 ? "s" : ""} ago`;
+    }
+    if (isToday(date)) {
+      return format(date, "p"); // e.g., 4:30 PM
+    }
+    if (isYesterday(date)) {
+      return `Yesterday at ${format(date, "p")}`;
+    }
+    // Older than yesterday - show Date and Time
+    return format(date, "MMM d, p"); // e.g., Apr 10, 4:30 PM
+    // Or include year for much older messages: format(date, 'P p') -> 04/10/2024, 4:30 PM
+  }
+
+  // Effect to update timestamp every minute
+  useEffect(() => {
+    // Update display time whenever messageDate changes (covers initial render and prop updates)
+    setDisplayTime(getFormattedTimestamp(messageDate));
+
+    const intervalId = setInterval(() => {
+      setDisplayTime(getFormattedTimestamp(messageDate));
+    }, 60000); // Update every 60 seconds
+
+    // Cleanup interval on component unmount or when messageDate changes
+    return () => clearInterval(intervalId);
+  }, [messageDate]); // Dependency is messageDate
 
   // Render message content with potential truncation
   const renderMessageContent = () => {
@@ -657,7 +701,12 @@ export function ChatMessage({ message, onReply }: ChatMessageProps) {
             <span className="font-medium mr-2">
               {message.sender?.username || "Unknown User"}
             </span>
-            <span className="text-xs text-gray-400">{timeAgo}</span>
+            <span
+              className="text-xs text-gray-400"
+              title={format(messageDate, "PPpp")}
+            >
+              {displayTime}
+            </span>
             {message.isEdited && (
               <span className="text-xs text-gray-400 ml-1">(edited)</span>
             )}
