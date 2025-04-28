@@ -229,16 +229,19 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
 
       const response = await messageApi.getMessages(channelId);
 
-      // Process messages to ensure ID mapping
+      // Process messages to ensure ID mapping AND correct timestamp
       const processedMessages = (response.data || []).map((msg: any) => ({
         ...msg,
         id: msg._id || msg.id,
         sender: msg.sender
           ? {
+              // Process sender
               ...msg.sender,
               id: msg.sender._id || msg.sender.id,
             }
           : null, // Handle cases where sender might be null
+        // Ensure timestamp is a Date object, using createdAt as primary source
+        timestamp: msg.createdAt ? new Date(msg.createdAt) : new Date(),
       }));
 
       setMessages(processedMessages);
