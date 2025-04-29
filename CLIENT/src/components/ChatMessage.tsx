@@ -811,7 +811,7 @@ export function ChatMessage({ message, onReply }: ChatMessageProps) {
               {/* Show message content if any */}
               {messageContent && (
                 <div className="relative">
-                  <div className="bg-purple-800/80 text-white px-4 py-2 rounded-lg text-left w-fit whitespace-pre-wrap break-words overflow-hidden max-w-full sm:max-w-[70%] md:max-w-[400px]">
+                  <div className="bg-purple-800/80 text-white px-4 py-2 rounded-lg text-left w-fit whitespace-pre-wrap break-words overflow-hidden max-w-full sm:max-w-[80%] md:max-w-[600px] lg:max-w-[800px]">
                     {renderMessageContent()}
 
                     {/* Read more / Read less button */}
