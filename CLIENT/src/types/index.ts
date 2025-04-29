@@ -77,6 +77,8 @@ export interface ChatContextType {
   loading: boolean;
   currentlyEditingId?: string | null;
   setCurrentlyEditingId?: (id: string | null) => void;
+  activeReplyTo: Message | null;
+  setActiveReplyTo: (message: Message | null) => void;
 }
 
 export type ThemeMode = "light" | "dark" | "system";
