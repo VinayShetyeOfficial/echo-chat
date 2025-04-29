@@ -811,7 +811,27 @@ export function ChatMessage({ message, onReply }: ChatMessageProps) {
               {/* Show message content if any */}
               {messageContent && (
                 <div className="relative">
-                  <div className="bg-purple-800/80 text-white px-4 py-2 rounded-lg text-left w-fit whitespace-pre-wrap break-words overflow-hidden max-w-full sm:max-w-[80%] md:max-w-[600px] lg:max-w-[800px]">
+                  {message.replyTo && (
+                    <div className="flex items-start mb-1">
+                      <div className="w-1 h-full bg-purple-400 mr-2 rounded-full"></div>
+                      <div className="bg-purple-950/70 px-3 py-2 rounded-md w-full">
+                        <div className="flex items-center mb-1">
+                          <span className="text-xs font-bold text-purple-300">
+                            {message.replyTo.sender?.username || "Unknown"}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-300 break-words">
+                          {message.replyTo.text}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div
+                    className={cn(
+                      "bg-purple-800/80 text-white px-4 py-2 rounded-lg text-left w-fit whitespace-pre-wrap break-words overflow-hidden max-w-full sm:max-w-[80%] md:max-w-[600px] lg:max-w-[800px]"
+                    )}
+                  >
                     {renderMessageContent()}
 
                     {/* Read more / Read less button */}
@@ -824,11 +844,11 @@ export function ChatMessage({ message, onReply }: ChatMessageProps) {
                       </button>
                     )}
                   </div>
+
+                  {/* Show reactions below the message */}
+                  {renderReactions()}
                 </div>
               )}
-
-              {/* Show reactions below the message */}
-              {renderReactions()}
             </div>
           )}
 
