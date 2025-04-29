@@ -72,7 +72,9 @@ router.post("/", (req: Request, res: Response) => {
     text: text?.substring(0, 20) + (text?.length > 20 ? "..." : ""),
     channelId,
     userId,
-    replyToId,
+    replyToId: replyToId
+      ? `${replyToId} (present)`
+      : "undefined (not replying)",
   });
 
   if (!userId) {
@@ -117,6 +119,22 @@ router.post("/", (req: Request, res: Response) => {
       if (replyToId) {
         console.log(`Adding replyTo reference: ${replyToId}`);
         messageData.replyTo = replyToId;
+
+        // Verify the reply message exists
+        try {
+          const replyMessage = await Message.findById(replyToId);
+          if (!replyMessage) {
+            console.warn(
+              `Warning: Replying to message ID ${replyToId} that doesn't exist`
+            );
+          } else {
+            console.log(
+              `Reply valid: Replying to message from ${replyMessage.sender}`
+            );
+          }
+        } catch (err) {
+          console.error(`Error checking reply message: ${err}`);
+        }
       }
 
       // Create message
