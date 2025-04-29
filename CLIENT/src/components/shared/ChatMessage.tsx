@@ -64,7 +64,7 @@ const ChatMessage = ({ message }: ChatMessageProps) => {
         {/* Message Text */}
         <div
           className={cn(
-            "p-2 rounded-lg max-w-xs md:max-w-md lg:max-w-lg break-words whitespace-normal relative", // Use break-words without break-all
+            "p-2 rounded-lg max-w-sm md:max-w-xl lg:max-w-2xl xl:max-w-3xl break-words whitespace-normal relative", // Use break-words without break-all
             isOwnMessage
               ? "bg-blue-500 text-white"
               : "bg-gray-200 dark:bg-gray-700"
