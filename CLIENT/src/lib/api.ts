@@ -168,23 +168,65 @@ export const messageApi = {
     }
 
     try {
+      console.log("Fetching messages for channel:", channelId);
       const response = await fetchApi(`/messages?channelId=${channelId}`);
+      console.log("Raw response from server:", response);
 
-      // Process reaction counts in each message
+      // Process messages to ensure all fields are properly handled
       if (response.data && Array.isArray(response.data)) {
         response.data = response.data.map((message: any) => {
-          // Ensure reactions have proper count values
-          if (message.reactions && Array.isArray(message.reactions)) {
-            message.reactions = message.reactions.map((reaction: any) => {
-              const users = Array.isArray(reaction.users) ? reaction.users : [];
-              return {
-                ...reaction,
-                // Always set count based on users array length
-                count: users.length,
-              };
-            });
+          console.log(
+            "Processing message:",
+            message.text,
+            "replyTo:",
+            message.replyTo
+          );
+
+          // Process message fields
+          const processedMessage = {
+            ...message,
+            id: message._id || message.id,
+            sender: message.sender
+              ? {
+                  ...message.sender,
+                  id: message.sender._id || message.sender.id,
+                }
+              : null,
+            // Process replyTo if it exists
+            replyTo: message.replyTo
+              ? {
+                  ...message.replyTo,
+                  id: message.replyTo._id || message.replyTo.id,
+                  // Process reply's sender if it exists
+                  sender: message.replyTo.sender
+                    ? {
+                        ...message.replyTo.sender,
+                        id:
+                          message.replyTo.sender._id ||
+                          message.replyTo.sender.id,
+                      }
+                    : null,
+                }
+              : null,
+            // Ensure reactions have proper count values
+            reactions: Array.isArray(message.reactions)
+              ? message.reactions.map((reaction: any) => {
+                  const users = Array.isArray(reaction.users)
+                    ? reaction.users
+                    : [];
+                  return {
+                    ...reaction,
+                    count: users.length,
+                  };
+                })
+              : [],
+          };
+
+          if (message.replyTo) {
+            console.log("Reply data processed:", processedMessage.replyTo);
           }
-          return message;
+
+          return processedMessage;
         });
       }
 
@@ -194,11 +236,35 @@ export const messageApi = {
       return { data: [] };
     }
   },
-  sendMessage: (data: any) =>
-    fetchApi("/messages", {
+  sendMessage: (data: {
+    text: string;
+    channelId: string;
+    attachments?: any[];
+    replyToId?: string;
+  }) => {
+    // Validate required fields
+    if (!data.text || !data.channelId) {
+      console.error("Missing required fields for sending message:", data);
+      return Promise.reject(new Error("Missing required fields"));
+    }
+
+    // Create request body
+    const body: any = {
+      text: data.text,
+      channelId: data.channelId,
+      attachments: data.attachments || [],
+    };
+
+    // Add replyToId if provided
+    if (data.replyToId) {
+      body.replyToId = data.replyToId;
+    }
+
+    return fetchApi("/messages", {
       method: "POST",
-      body: JSON.stringify(data),
-    }),
+      body: JSON.stringify(body),
+    });
+  },
   updateMessage: (id: string, data: any) =>
     fetchApi(`/messages/${id}`, {
       method: "PUT",
