@@ -613,7 +613,7 @@ export function ChatMessage({ message, onReply }: ChatMessageProps) {
           {lines.map((line, index, array) => (
             <div key={index} className="w-full">
               <span
-                className="break-words whitespace-normal inline-block w-full message-content"
+                className="break-words break-all inline-block w-full message-content"
                 dangerouslySetInnerHTML={{ __html: formatText(line) }}
               />
               {index < array.length - 1 && <br />}
@@ -644,7 +644,7 @@ export function ChatMessage({ message, onReply }: ChatMessageProps) {
           {truncatedContent.split("\n").map((line, index, array) => (
             <div key={index} className="w-full">
               <span
-                className="break-words whitespace-normal inline-block w-full message-content"
+                className="break-words break-all inline-block w-full message-content"
                 dangerouslySetInnerHTML={{ __html: formatText(line) }}
               />
               {index < array.length - 1 && <br />}
@@ -811,7 +811,7 @@ export function ChatMessage({ message, onReply }: ChatMessageProps) {
               {/* Show message content if any */}
               {messageContent && (
                 <div className="relative">
-                  <div className="bg-purple-800/80 text-white px-4 py-2 rounded-lg text-left w-fit whitespace-pre-wrap break-words overflow-hidden max-w-full sm:max-w-[70%] md:max-w-[400px]">
+                  <div className="bg-purple-800/80 text-white px-4 py-2 rounded-lg text-left w-fit whitespace-pre-wrap break-words break-all max-w-full sm:max-w-[70%] md:max-w-[400px] overflow-hidden">
                     {renderMessageContent()}
 
                     {/* Read more / Read less button */}
