@@ -557,20 +557,16 @@ export function MessageInput({
       )}
 
       {replyTo && (
-        <div className="flex items-start bg-muted/30 p-2 rounded-md mb-2 text-sm animate-fade-in">
-          <div className="flex-shrink-0 mr-2 text-muted-foreground font-medium">
-            Replying to {replyTo.sender}:
+        <div className="flex items-center bg-muted/30 p-2 rounded-md mb-2 text-sm animate-fade-in">
+          <div className="flex-shrink-0 mr-2 text-muted-foreground">
+            Replying to {replyTo.sender}
           </div>
-          <div className="flex-1 text-left overflow-hidden">
-            <span className="line-clamp-1 text-ellipsis max-w-full">
-              {replyTo.text}
-            </span>
-          </div>
+          <span className="truncate flex-1">{replyTo.text}</span>
           <Button
             size="sm"
             variant="ghost"
             onClick={onCancelReply}
-            className="h-6 w-6 p-0 flex-shrink-0 ml-2"
+            className="h-6 w-6 p-0"
           >
             <X className="h-4 w-4" />
           </Button>
