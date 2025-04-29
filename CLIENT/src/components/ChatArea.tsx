@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Message } from "../types";
 import { UserPlus } from "lucide-react";
 import { InviteButton } from "./InviteButton";
+import { useChat } from "@/contexts/ChatContext";
 
 interface ChatAreaProps {
   messages: Message[];
@@ -19,7 +20,8 @@ export function ChatArea({
   onEditMessage,
   onDeleteMessage,
 }: ChatAreaProps) {
-  const [replyTo, setReplyTo] = useState<Message | undefined>(undefined);
+  // Use context instead of local state for reply functionality
+  const { activeReplyTo, setActiveReplyTo } = useChat();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
@@ -54,22 +56,23 @@ export function ChatArea({
   };
 
   const handleReply = (message: Message) => {
-    setReplyTo(message);
+    setActiveReplyTo(message);
   };
 
   const handleSendMessage = (text: string, attachments?: File[]) => {
     onSendMessage(text, attachments);
-    setReplyTo(undefined);
+    // Context's setActiveReplyTo will be called in the sendMessage function
+    // to reset after sending
   };
 
   // Create a simplified version of the message for the MessageInput component
   const getSimplifiedReply = () => {
-    if (!replyTo) return null;
+    if (!activeReplyTo) return null;
 
     return {
-      id: replyTo.id,
-      text: replyTo.text,
-      sender: replyTo.sender.username,
+      id: activeReplyTo.id,
+      text: activeReplyTo.text,
+      sender: activeReplyTo.sender.username,
     };
   };
 
@@ -130,7 +133,7 @@ export function ChatArea({
       <MessageInput
         onSendMessage={handleSendMessage}
         replyTo={getSimplifiedReply()}
-        onCancelReply={() => setReplyTo(undefined)}
+        onCancelReply={() => setActiveReplyTo(undefined)}
       />
     </div>
   );
