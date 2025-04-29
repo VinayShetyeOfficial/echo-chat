@@ -62,37 +62,72 @@ const ChatMessage = ({ message }: ChatMessageProps) => {
           </span>
         </div>
         {/* Message Text */}
-        <div
-          className={cn(
-            "p-2 rounded-lg max-w-sm md:max-w-xl lg:max-w-2xl xl:max-w-3xl break-words whitespace-normal relative", // Use break-words without break-all
-            isOwnMessage
-              ? "bg-blue-500 text-white"
-              : "bg-gray-200 dark:bg-gray-700"
-          )}
-        >
-          {message.text}
-
-          {/* Emoji Picker Logic */}
-          {showEmojiPicker && (
-            <div
-              className={cn(
-                "absolute z-10",
-                isOwnMessage
-                  ? "bottom-full right-0 mb-1"
-                  : "bottom-full left-0 mb-1" // Position picker based on sender
-              )}
-            >
-              <Picker
-                data={data}
-                onEmojiSelect={handleReact}
-                theme={
-                  document.documentElement.classList.contains("dark")
-                    ? "dark"
-                    : "light"
-                }
-              />
+        <div className="relative">
+          {message.replyTo && (
+            <div className="flex items-start mb-1">
+              <div
+                className={cn(
+                  "w-1 h-full mr-2 rounded-full",
+                  isOwnMessage ? "bg-blue-400" : "bg-gray-400"
+                )}
+              ></div>
+              <div
+                className={cn(
+                  "px-3 py-2 rounded-md w-full",
+                  isOwnMessage
+                    ? "bg-blue-900/70"
+                    : "bg-gray-700/50 dark:bg-gray-800/70"
+                )}
+              >
+                <div className="flex items-center mb-1">
+                  <span
+                    className={cn(
+                      "text-xs font-bold",
+                      isOwnMessage ? "text-blue-200" : "text-gray-300"
+                    )}
+                  >
+                    {message.replyTo.sender?.username || "Unknown"}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-300 break-words">
+                  {message.replyTo.text}
+                </div>
+              </div>
             </div>
           )}
+
+          <div
+            className={cn(
+              "p-2 rounded-lg break-words whitespace-normal max-w-sm md:max-w-xl lg:max-w-2xl xl:max-w-3xl",
+              isOwnMessage
+                ? "bg-blue-500 text-white"
+                : "bg-gray-200 dark:bg-gray-700"
+            )}
+          >
+            {message.text}
+
+            {/* Emoji Picker Logic */}
+            {showEmojiPicker && (
+              <div
+                className={cn(
+                  "absolute z-10",
+                  isOwnMessage
+                    ? "bottom-full right-0 mb-1"
+                    : "bottom-full left-0 mb-1" // Position picker based on sender
+                )}
+              >
+                <Picker
+                  data={data}
+                  onEmojiSelect={handleReact}
+                  theme={
+                    document.documentElement.classList.contains("dark")
+                      ? "dark"
+                      : "light"
+                  }
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Display Reactions */}
