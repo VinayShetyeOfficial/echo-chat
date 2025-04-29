@@ -44,6 +44,10 @@ router.get("/", (req: Request, res: Response) => {
       // Fetch messages
       const messages = await Message.find({ channelId })
         .populate("sender")
+        .populate({
+          path: "replyTo",
+          populate: { path: "sender" },
+        })
         .sort({ createdAt: 1 });
 
       return res.status(200).json({
@@ -61,8 +65,15 @@ router.get("/", (req: Request, res: Response) => {
 
 // Send a message
 router.post("/", (req: Request, res: Response) => {
-  const { text, channelId, attachments } = req.body;
+  const { text, channelId, attachments, replyToId } = req.body;
   const userId = req.user?.id;
+
+  console.log("POST /messages received:", {
+    text: text?.substring(0, 20) + (text?.length > 20 ? "..." : ""),
+    channelId,
+    userId,
+    replyToId,
+  });
 
   if (!userId) {
     return res.status(401).json({ message: "Unauthorized" });
@@ -94,15 +105,25 @@ router.post("/", (req: Request, res: Response) => {
           .json({ message: "You don't have access to this channel" });
       }
 
-      // Create message
-      const message = new Message({
+      // Create message object with base properties
+      const messageData: any = {
         text,
         sender: userId,
         channelId,
         attachments: attachments || [],
-      });
+      };
+
+      // Add replyTo reference if provided
+      if (replyToId) {
+        console.log(`Adding replyTo reference: ${replyToId}`);
+        messageData.replyTo = replyToId;
+      }
+
+      // Create message
+      const message = new Message(messageData);
 
       await message.save();
+      console.log(`Message saved with ID: ${message._id}`);
 
       // Update channel's lastMessage using findByIdAndUpdate
       await Channel.findByIdAndUpdate(channelId, {
@@ -114,6 +135,24 @@ router.post("/", (req: Request, res: Response) => {
       // Populate sender info for response
       await message.populate("sender");
 
+      // Populate replyTo message if it exists
+      if (message.replyTo) {
+        console.log(`Populating replyTo field for message: ${message._id}`);
+        await message.populate({
+          path: "replyTo",
+          populate: { path: "sender" },
+        });
+        // Access populated data safely
+        const replyToData = message.replyTo as any;
+        if (replyToData) {
+          console.log(`ReplyTo populated:`, {
+            replyToId: replyToData._id,
+            replyToText: replyToData.text?.substring(0, 20),
+            replyToSender: replyToData.sender?.username,
+          });
+        }
+      }
+
       // Get the io instance from the request to emit the message
       if (req.app.get("io")) {
         req.app.get("io").to(channelId).emit("new_message", message);
@@ -124,6 +163,7 @@ router.post("/", (req: Request, res: Response) => {
         data: message,
       });
     } catch (error: any) {
+      console.error("Error sending message:", error);
       return res.status(500).json({
         message: "Error sending message",
         error: error.message,
