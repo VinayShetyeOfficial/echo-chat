@@ -810,25 +810,8 @@ export function ChatMessage({ message, onReply }: ChatMessageProps) {
 
               {/* Show message content if any */}
               {messageContent && (
-                <div className="relative w-fit">
-                  <div
-                    className={cn(
-                      "bg-purple-800/80 text-white px-4 py-2 text-left w-fit whitespace-pre-wrap break-words overflow-hidden max-w-full sm:max-w-[80%] md:max-w-[600px] lg:max-w-[800px] rounded-lg"
-                    )}
-                  >
-                    {message.replyTo && (
-                      <div className="mb-2 border-l-4 border-purple-300 bg-[#00000036] px-3 py-2 rounded-md -mx-3 -mt-1">
-                        <div className="flex items-center">
-                          <span className="text-xs font-semibold text-purple-200">
-                            {message.replyTo.sender?.username || "Unknown"}
-                          </span>
-                        </div>
-                        <div className="text-xs text-gray-300/90 break-words line-clamp-1 mr-2">
-                          {message.replyTo.text}
-                        </div>
-                      </div>
-                    )}
-
+                <div className="relative">
+                  <div className="bg-purple-800/80 text-white px-4 py-2 rounded-lg text-left w-fit whitespace-pre-wrap break-words overflow-hidden max-w-full sm:max-w-[80%] md:max-w-[600px] lg:max-w-[800px]">
                     {renderMessageContent()}
 
                     {/* Read more / Read less button */}
@@ -841,11 +824,11 @@ export function ChatMessage({ message, onReply }: ChatMessageProps) {
                       </button>
                     )}
                   </div>
-
-                  {/* Show reactions below the message */}
-                  {renderReactions()}
                 </div>
               )}
+
+              {/* Show reactions below the message */}
+              {renderReactions()}
             </div>
           )}
 
