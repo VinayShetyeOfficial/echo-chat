@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 import { Message } from "../types";
 import { UserPlus } from "lucide-react";
 import { InviteButton } from "./InviteButton";
-import { useChat } from "@/contexts/ChatContext";
 
 interface ChatAreaProps {
   messages: Message[];
@@ -20,8 +19,7 @@ export function ChatArea({
   onEditMessage,
   onDeleteMessage,
 }: ChatAreaProps) {
-  // Use context instead of local state for reply functionality
-  const { activeReplyTo, setActiveReplyTo } = useChat();
+  const [replyTo, setReplyTo] = useState<Message | undefined>(undefined);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
@@ -56,25 +54,22 @@ export function ChatArea({
   };
 
   const handleReply = (message: Message) => {
-    // Store the full message object to ensure we have all the data we need
-    setActiveReplyTo(message);
+    setReplyTo(message);
   };
 
   const handleSendMessage = (text: string, attachments?: File[]) => {
-    // Pass the message text to onSendMessage (the actual sending happens in ChatContext)
     onSendMessage(text, attachments);
-    // Context's setActiveReplyTo will be called in the sendMessage function
-    // to reset after sending
+    setReplyTo(undefined);
   };
 
   // Create a simplified version of the message for the MessageInput component
   const getSimplifiedReply = () => {
-    if (!activeReplyTo) return null;
+    if (!replyTo) return null;
 
     return {
-      id: activeReplyTo.id,
-      text: activeReplyTo.text,
-      sender: activeReplyTo.sender.username,
+      id: replyTo.id,
+      text: replyTo.text,
+      sender: replyTo.sender.username,
     };
   };
 
@@ -135,7 +130,7 @@ export function ChatArea({
       <MessageInput
         onSendMessage={handleSendMessage}
         replyTo={getSimplifiedReply()}
-        onCancelReply={() => setActiveReplyTo(undefined)}
+        onCancelReply={() => setReplyTo(undefined)}
       />
     </div>
   );
