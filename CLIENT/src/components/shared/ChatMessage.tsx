@@ -62,48 +62,49 @@ const ChatMessage = ({ message }: ChatMessageProps) => {
           </span>
         </div>
         {/* Message Text */}
-        <div className="relative">
-          {message.replyTo && (
-            <div className="flex items-start mb-1">
-              <div
-                className={cn(
-                  "w-1 h-full mr-2 rounded-full",
-                  isOwnMessage ? "bg-blue-400" : "bg-gray-400"
-                )}
-              ></div>
-              <div
-                className={cn(
-                  "px-3 py-2 rounded-md w-full",
-                  isOwnMessage
-                    ? "bg-blue-900/70"
-                    : "bg-gray-700/50 dark:bg-gray-800/70"
-                )}
-              >
-                <div className="flex items-center mb-1">
-                  <span
-                    className={cn(
-                      "text-xs font-bold",
-                      isOwnMessage ? "text-blue-200" : "text-gray-300"
-                    )}
-                  >
-                    {message.replyTo.sender?.username || "Unknown"}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-300 break-words">
-                  {message.replyTo.text}
-                </div>
-              </div>
-            </div>
-          )}
-
+        <div className="relative w-fit">
           <div
             className={cn(
-              "p-2 rounded-lg break-words whitespace-normal max-w-sm md:max-w-xl lg:max-w-2xl xl:max-w-3xl",
+              "p-2 break-words whitespace-normal max-w-sm md:max-w-xl lg:max-w-2xl xl:max-w-3xl rounded-lg",
               isOwnMessage
                 ? "bg-blue-500 text-white"
                 : "bg-gray-200 dark:bg-gray-700"
             )}
           >
+            {message.replyTo && (
+              <div
+                className={cn(
+                  "mb-2 border-l-4 w-full px-3 py-2 rounded-l-md -mx-2 -mt-2",
+                  isOwnMessage
+                    ? "border-blue-300 bg-[#00000036]"
+                    : "border-gray-400 dark:border-gray-500 bg-[#00000036]"
+                )}
+              >
+                <div className="flex items-center">
+                  <span
+                    className={cn(
+                      "text-xs font-semibold",
+                      isOwnMessage
+                        ? "text-blue-200"
+                        : "text-gray-200 dark:text-gray-200"
+                    )}
+                  >
+                    {message.replyTo.sender?.username || "Unknown"}
+                  </span>
+                </div>
+                <div
+                  className={cn(
+                    "text-xs break-words line-clamp-1 mr-2",
+                    isOwnMessage
+                      ? "text-blue-100/90"
+                      : "text-gray-600/90 dark:text-gray-300/90"
+                  )}
+                >
+                  {message.replyTo.text}
+                </div>
+              </div>
+            )}
+
             {message.text}
 
             {/* Emoji Picker Logic */}
