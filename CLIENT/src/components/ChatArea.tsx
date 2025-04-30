@@ -56,10 +56,12 @@ export function ChatArea({
   };
 
   const handleReply = (message: Message) => {
+    // Store the full message object to ensure we have all the data we need
     setActiveReplyTo(message);
   };
 
   const handleSendMessage = (text: string, attachments?: File[]) => {
+    // Pass the message text to onSendMessage (the actual sending happens in ChatContext)
     onSendMessage(text, attachments);
     // Context's setActiveReplyTo will be called in the sendMessage function
     // to reset after sending
