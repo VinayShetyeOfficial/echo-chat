@@ -43,7 +43,6 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   const [currentlyEditingId, setCurrentlyEditingId] = useState<string | null>(
     null
   );
-  const [activeReplyTo, setActiveReplyTo] = useState<Message | null>(null);
 
   const { user } = useAuth();
 
@@ -386,7 +385,6 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       attachments: [], // Handle attachments properly if needed
       reactions: [],
       isEdited: false,
-      replyTo: activeReplyTo || undefined, // Include reply reference if exists
     };
 
     // 2. Optimistically update the UI
@@ -406,11 +404,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
         text: content,
         channelId: activeChannel.id,
         attachments: [], // Send attachment data if implementing uploads
-        replyToId: activeReplyTo?.id, // Include replyToId if it exists
       };
-
-      // Clear the active reply after sending
-      setActiveReplyTo(null);
 
       // DEBUG: Log the data being sent
       console.log("[sendMessage] Sending data:", messageData);
@@ -448,22 +442,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
         attachments: savedMessageData.attachments || [],
         reactions: savedMessageData.reactions || [],
         isEdited: savedMessageData.isEdited || false,
-        replyTo: savedMessageData.replyTo
-          ? {
-              // Process the replyTo message if it exists
-              ...savedMessageData.replyTo,
-              id: savedMessageData.replyTo._id || savedMessageData.replyTo.id,
-              // Process the replyTo sender if it exists
-              sender: savedMessageData.replyTo.sender
-                ? {
-                    ...savedMessageData.replyTo.sender,
-                    id:
-                      savedMessageData.replyTo.sender._id ||
-                      savedMessageData.replyTo.sender.id,
-                  }
-                : undefined,
-            }
-          : undefined, // Add replyTo if it exists
+        replyTo: savedMessageData.replyTo, // Add replyTo if it exists
       };
 
       // 4. Update the temporary message with the processed one from the server
@@ -744,35 +723,20 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // Create context value with the additional replyTo state and functions
-  const contextValue = useMemo(
-    () => ({
-      channels,
-      activeChannel,
-      messages,
-      loading,
-      error,
-      setActiveChannel: handleSetActiveChannel,
-      sendMessage,
-      editMessage,
-      deleteMessage,
-      reactToMessage,
-      createChannel,
-      currentlyEditingId,
-      setCurrentlyEditingId,
-      activeReplyTo,
-      setActiveReplyTo,
-    }),
-    [
-      channels,
-      activeChannel,
-      messages,
-      loading,
-      error,
-      currentlyEditingId,
-      activeReplyTo,
-    ]
-  );
+  const contextValue: ChatContextType = {
+    channels,
+    activeChannel,
+    messages,
+    loading,
+    setActiveChannel: handleSetActiveChannel,
+    sendMessage,
+    editMessage,
+    deleteMessage,
+    reactToMessage,
+    createChannel,
+    currentlyEditingId,
+    setCurrentlyEditingId,
+  };
 
   return (
     <ChatContext.Provider value={contextValue}>{children}</ChatContext.Provider>
