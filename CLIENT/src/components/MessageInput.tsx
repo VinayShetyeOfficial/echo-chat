@@ -704,7 +704,7 @@ export function MessageInput({
               onEscapeKeyDown={() => setIsEmojiPickerOpen(false)}
               onInteractOutside={() => setIsEmojiPickerOpen(false)}
             >
-              <div className="h-[350px]">
+              <div className="h-[433px]">
                 <Picker
                   data={data}
                   onEmojiSelect={(emoji) => {
