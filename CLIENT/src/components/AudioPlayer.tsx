@@ -1,112 +1,103 @@
-import { useState, useRef, useEffect } from "react";
-import { Play, Pause } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
-import { formatDuration } from "@/lib/utils";
+"use client"
+
+import { useState, useRef, useEffect } from "react"
+import { Play, Pause } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Slider } from "@/components/ui/slider"
 
 interface AudioPlayerProps {
-  src: string;
-  className?: string;
+  src: string
+  className?: string
 }
 
 export function AudioPlayer({ src, className = "" }: AudioPlayerProps) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [duration, setDuration] = useState(0)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [isLoaded, setIsLoaded] = useState(false)
+  const audioRef = useRef<HTMLAudioElement>(null)
 
   // Load audio metadata
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    const audio = audioRef.current
+    if (!audio) return
 
     // Set initial state
     const handleLoadedMetadata = () => {
-      if (
-        audio.duration &&
-        !isNaN(audio.duration) &&
-        audio.duration !== Infinity
-      ) {
-        setDuration(audio.duration);
+      if (audio.duration && !isNaN(audio.duration) && audio.duration !== Number.POSITIVE_INFINITY) {
+        setDuration(audio.duration)
       } else {
         // Default duration if we can't determine it
-        setDuration(0);
+        setDuration(0)
       }
-      setIsLoaded(true);
-    };
+      setIsLoaded(true)
+    }
 
     const handleDurationChange = () => {
-      if (
-        audio.duration &&
-        !isNaN(audio.duration) &&
-        audio.duration !== Infinity
-      ) {
-        setDuration(audio.duration);
+      if (audio.duration && !isNaN(audio.duration) && audio.duration !== Number.POSITIVE_INFINITY) {
+        setDuration(audio.duration)
       }
-    };
+    }
 
     const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-    };
+      setCurrentTime(audio.currentTime)
+    }
 
     const handleEnded = () => {
-      setIsPlaying(false);
-      setCurrentTime(0);
-      audio.currentTime = 0;
-    };
+      setIsPlaying(false)
+      setCurrentTime(0)
+      audio.currentTime = 0
+    }
 
-    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
-    audio.addEventListener("durationchange", handleDurationChange);
-    audio.addEventListener("timeupdate", handleTimeUpdate);
-    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata)
+    audio.addEventListener("durationchange", handleDurationChange)
+    audio.addEventListener("timeupdate", handleTimeUpdate)
+    audio.addEventListener("ended", handleEnded)
 
     return () => {
-      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
-      audio.removeEventListener("durationchange", handleDurationChange);
-      audio.removeEventListener("timeupdate", handleTimeUpdate);
-      audio.removeEventListener("ended", handleEnded);
-    };
-  }, [src]);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata)
+      audio.removeEventListener("durationchange", handleDurationChange)
+      audio.removeEventListener("timeupdate", handleTimeUpdate)
+      audio.removeEventListener("ended", handleEnded)
+    }
+  }, [src])
 
   // Handle play/pause
   const togglePlay = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    const audio = audioRef.current
+    if (!audio) return
 
     if (isPlaying) {
-      audio.pause();
+      audio.pause()
     } else {
       audio.play().catch((err) => {
-        console.error("Error playing audio:", err);
-      });
+        console.error("Error playing audio:", err)
+      })
     }
 
-    setIsPlaying(!isPlaying);
-  };
+    setIsPlaying(!isPlaying)
+  }
 
   // Handle seek
   const handleSeek = (value: number[]) => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    const audio = audioRef.current
+    if (!audio) return
 
-    audio.currentTime = value[0];
-    setCurrentTime(value[0]);
-  };
+    audio.currentTime = value[0]
+    setCurrentTime(value[0])
+  }
 
   // Format time display
   const formatTime = (time: number) => {
-    if (isNaN(time) || time === Infinity) return "0:00";
+    if (isNaN(time) || time === Number.POSITIVE_INFINITY) return "0:00"
 
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-  };
+    const minutes = Math.floor(time / 60)
+    const seconds = Math.floor(time % 60)
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`
+  }
 
   return (
-    <div
-      className={`flex items-center gap-3 rounded-lg p-3 bg-muted/10 w-full max-w-[300px] ${className}`}
-    >
+    <div className={`flex items-center gap-3 rounded-lg p-3 bg-muted/10 w-full max-w-[300px] ${className}`}>
       <audio ref={audioRef} src={src} preload="metadata" />
 
       <Button
@@ -116,11 +107,7 @@ export function AudioPlayer({ src, className = "" }: AudioPlayerProps) {
         onClick={togglePlay}
         disabled={!isLoaded}
       >
-        {isPlaying ? (
-          <Pause className="h-4 w-4" />
-        ) : (
-          <Play className="h-4 w-4" />
-        )}
+        {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
       </Button>
 
       <div className="flex-1 flex flex-col">
@@ -139,5 +126,5 @@ export function AudioPlayer({ src, className = "" }: AudioPlayerProps) {
         </div>
       </div>
     </div>
-  );
+  )
 }
