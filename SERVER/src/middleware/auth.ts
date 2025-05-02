@@ -1,47 +1,43 @@
-import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
-import { User } from "../models/User";
+import type { Request, Response, NextFunction } from "express"
+import jwt from "jsonwebtoken"
+import { User } from "../models/User"
 
 // Extend the Request type to include user
 declare global {
   namespace Express {
     interface Request {
-      user?: any;
+      user?: any
     }
   }
 }
 
-export const authMiddleware = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Get token from header
-    const authHeader = req.headers.authorization;
+    const authHeader = req.headers.authorization
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "No token provided" });
+      return res.status(401).json({ message: "No token provided" })
     }
 
-    const token = authHeader.split(" ")[1];
+    const token = authHeader.split(" ")[1]
 
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any
 
     // Find user
-    const user = await User.findById(decoded.id);
+    const user = await User.findById(decoded.id)
     if (!user) {
-      return res.status(401).json({ message: "Invalid token" });
+      return res.status(401).json({ message: "Invalid token" })
     }
 
     // Add user to request
-    req.user = user;
+    req.user = user
 
-    next();
+    next()
   } catch (error) {
-    return res.status(401).json({ message: "Invalid token" });
+    return res.status(401).json({ message: "Invalid token" })
   }
-};
+}
 
 // Export protect as an alias for authMiddleware to maintain compatibility
-export const protect = authMiddleware;
+export const protect = authMiddleware

@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose from "mongoose"
 
 const channelSchema = new mongoose.Schema(
   {
@@ -31,7 +31,7 @@ const channelSchema = new mongoose.Schema(
       },
     ],
   },
-  { timestamps: true }
-);
+  { timestamps: true },
+)
 
-export const Channel = mongoose.model("Channel", channelSchema);
+export const Channel = mongoose.model("Channel", channelSchema)

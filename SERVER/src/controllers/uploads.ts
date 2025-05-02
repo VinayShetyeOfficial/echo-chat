@@ -1,9 +1,7 @@
-import { Request, Response } from "express";
-import { prisma } from "../index";
-import { getFileType } from "../middleware/upload";
-import path from "path";
-import fs from "fs";
-import { FileRequest } from "../types";
+import type { Response } from "express"
+import { prisma } from "../index"
+import { getFileType } from "../middleware/upload"
+import type { FileRequest } from "../types"
 
 /**
  * Upload files
@@ -12,7 +10,7 @@ import { FileRequest } from "../types";
  */
 export const uploadFile = async (req: FileRequest, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.id
     if (!userId) {
       res.status(401).json({
         success: false,
@@ -21,8 +19,8 @@ export const uploadFile = async (req: FileRequest, res: Response) => {
           statusCode: 401,
           code: "NOT_AUTHENTICATED",
         },
-      });
-      return;
+      })
+      return
     }
 
     // Check if files were uploaded
@@ -34,21 +32,19 @@ export const uploadFile = async (req: FileRequest, res: Response) => {
           statusCode: 400,
           code: "NO_FILES",
         },
-      });
-      return;
+      })
+      return
     }
 
-    const files = req.files;
-    const uploadedFiles = [];
+    const files = req.files
+    const uploadedFiles = []
 
     // Process each file
     for (const file of files) {
-      const fileType = getFileType(file.mimetype);
+      const fileType = getFileType(file.mimetype)
 
       // Create a URL for the file
-      const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${
-        file.filename
-      }`;
+      const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${file.filename}`
 
       // Create attachment record in database
       const attachment = await prisma.attachment.create({
@@ -59,21 +55,21 @@ export const uploadFile = async (req: FileRequest, res: Response) => {
           fileName: file.originalname,
           fileSize: file.size,
           mimeType: file.mimetype,
-          width: req.body.width ? parseInt(req.body.width) : null,
-          height: req.body.height ? parseInt(req.body.height) : null,
-          duration: req.body.duration ? parseInt(req.body.duration) : null,
+          width: req.body.width ? Number.parseInt(req.body.width) : null,
+          height: req.body.height ? Number.parseInt(req.body.height) : null,
+          duration: req.body.duration ? Number.parseInt(req.body.duration) : null,
         },
-      });
+      })
 
-      uploadedFiles.push(attachment);
+      uploadedFiles.push(attachment)
     }
 
     res.status(201).json({
       success: true,
       data: uploadedFiles,
-    });
+    })
   } catch (error) {
-    console.error("File upload error:", error);
+    console.error("File upload error:", error)
     res.status(500).json({
       success: false,
       error: {
@@ -81,9 +77,9 @@ export const uploadFile = async (req: FileRequest, res: Response) => {
         statusCode: 500,
         code: "UPLOAD_ERROR",
       },
-    });
+    })
   }
-};
+}
 
 /**
  * Serve static files

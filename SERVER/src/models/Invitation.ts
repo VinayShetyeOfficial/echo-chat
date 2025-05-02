@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose from "mongoose"
 
 const invitationSchema = new mongoose.Schema(
   {
@@ -21,7 +21,7 @@ const invitationSchema = new mongoose.Schema(
       ref: "User",
     },
   },
-  { timestamps: true }
-);
+  { timestamps: true },
+)
 
-export const Invitation = mongoose.model("Invitation", invitationSchema);
+export const Invitation = mongoose.model("Invitation", invitationSchema)

@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose from "mongoose"
 
 const attachmentSchema = new mongoose.Schema({
   type: { type: String, enum: ["image", "audio", "file"], required: true },
@@ -9,12 +9,12 @@ const attachmentSchema = new mongoose.Schema({
   width: Number,
   height: Number,
   duration: Number, // for audio/video
-});
+})
 
 const reactionSchema = new mongoose.Schema({
   emoji: { type: String, required: true },
   users: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-});
+})
 
 const messageSchema = new mongoose.Schema(
   {
@@ -40,7 +40,7 @@ const messageSchema = new mongoose.Schema(
       },
     ],
   },
-  { timestamps: true }
-);
+  { timestamps: true },
+)
 
-export const Message = mongoose.model("Message", messageSchema);
+export const Message = mongoose.model("Message", messageSchema)

@@ -1,5 +1,5 @@
-import { Request, Response } from "express";
-import { prisma } from "../index";
+import type { Request, Response } from "express"
+import { prisma } from "../index"
 
 /**
  * Get messages for a channel
@@ -8,10 +8,10 @@ import { prisma } from "../index";
  */
 export const getMessagesForChannel = async (req: Request, res: Response) => {
   try {
-    const { channelId } = req.params;
-    const since = req.query.since ? parseInt(req.query.since as string) : 0;
+    const { channelId } = req.params
+    const since = req.query.since ? Number.parseInt(req.query.since as string) : 0
 
-    let query = prisma.message.findMany({
+    const query = prisma.message.findMany({
       where: {
         channelId,
         ...(since > 0
@@ -30,9 +30,9 @@ export const getMessagesForChannel = async (req: Request, res: Response) => {
         attachments: true,
         reactions: true,
       },
-    });
+    })
 
-    const messages = await query;
+    const messages = await query
 
     // Transform to match your client format
     const formattedMessages = messages.map((message) => ({
@@ -49,15 +49,15 @@ export const getMessagesForChannel = async (req: Request, res: Response) => {
       reactions: message.reactions,
       isEdited: message.isEdited,
       replyTo: message.replyToId ? { id: message.replyToId } : null,
-    }));
+    }))
 
     // Wrap in the expected format with a data property
     res.json({
       success: true,
       data: formattedMessages,
-    });
+    })
   } catch (error) {
-    console.error("Error fetching messages:", error);
+    console.error("Error fetching messages:", error)
     res.status(500).json({
       success: false,
       error: {
@@ -65,9 +65,9 @@ export const getMessagesForChannel = async (req: Request, res: Response) => {
         statusCode: 500,
         code: "MESSAGES_FETCH_ERROR",
       },
-    });
+    })
   }
-};
+}
 
 /**
  * Send a message
@@ -76,8 +76,8 @@ export const getMessagesForChannel = async (req: Request, res: Response) => {
  */
 export const sendMessage = async (req: Request, res: Response) => {
   try {
-    const { channelId, content, attachments, replyToId } = req.body;
-    const userId = req.user?.id;
+    const { channelId, content, attachments, replyToId } = req.body
+    const userId = req.user?.id
 
     if (!userId) {
       return res.status(401).json({
@@ -87,7 +87,7 @@ export const sendMessage = async (req: Request, res: Response) => {
           statusCode: 401,
           code: "NOT_AUTHENTICATED",
         },
-      });
+      })
     }
 
     // Check if the user is a member of the channel
@@ -96,7 +96,7 @@ export const sendMessage = async (req: Request, res: Response) => {
         channelId,
         userId,
       },
-    });
+    })
 
     if (!isMember) {
       return res.status(403).json({
@@ -106,7 +106,7 @@ export const sendMessage = async (req: Request, res: Response) => {
           statusCode: 403,
           code: "NOT_CHANNEL_MEMBER",
         },
-      });
+      })
     }
 
     // Create message
@@ -156,7 +156,7 @@ export const sendMessage = async (req: Request, res: Response) => {
           },
         },
       },
-    });
+    })
 
     // Update the channel's last message
     await prisma.channel.update({
@@ -165,14 +165,14 @@ export const sendMessage = async (req: Request, res: Response) => {
         lastMessageId: message.id,
         updatedAt: new Date(),
       },
-    });
+    })
 
     res.status(201).json({
       success: true,
       data: message,
-    });
+    })
   } catch (error) {
-    console.error("Send message error:", error);
+    console.error("Send message error:", error)
     res.status(500).json({
       success: false,
       error: {
@@ -180,9 +180,9 @@ export const sendMessage = async (req: Request, res: Response) => {
         statusCode: 500,
         code: "MESSAGE_SEND_ERROR",
       },
-    });
+    })
   }
-};
+}
 
 /**
  * Update a message
@@ -191,9 +191,9 @@ export const sendMessage = async (req: Request, res: Response) => {
  */
 export const updateMessage = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const { content } = req.body;
-    const userId = req.user?.id;
+    const { id } = req.params
+    const { content } = req.body
+    const userId = req.user?.id
 
     if (!userId) {
       return res.status(401).json({
@@ -203,7 +203,7 @@ export const updateMessage = async (req: Request, res: Response) => {
           statusCode: 401,
           code: "NOT_AUTHENTICATED",
         },
-      });
+      })
     }
 
     // Check if the message exists and belongs to the user
@@ -212,7 +212,7 @@ export const updateMessage = async (req: Request, res: Response) => {
         id,
         userId,
       },
-    });
+    })
 
     if (!message) {
       return res.status(404).json({
@@ -222,7 +222,7 @@ export const updateMessage = async (req: Request, res: Response) => {
           statusCode: 404,
           code: "MESSAGE_NOT_FOUND",
         },
-      });
+      })
     }
 
     // Update the message
@@ -253,14 +253,14 @@ export const updateMessage = async (req: Request, res: Response) => {
         },
         attachments: true,
       },
-    });
+    })
 
     res.status(200).json({
       success: true,
       data: updatedMessage,
-    });
+    })
   } catch (error) {
-    console.error("Update message error:", error);
+    console.error("Update message error:", error)
     res.status(500).json({
       success: false,
       error: {
@@ -268,9 +268,9 @@ export const updateMessage = async (req: Request, res: Response) => {
         statusCode: 500,
         code: "MESSAGE_UPDATE_ERROR",
       },
-    });
+    })
   }
-};
+}
 
 /**
  * Delete a message
@@ -279,8 +279,8 @@ export const updateMessage = async (req: Request, res: Response) => {
  */
 export const deleteMessage = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const userId = req.user?.id;
+    const { id } = req.params
+    const userId = req.user?.id
 
     if (!userId) {
       return res.status(401).json({
@@ -290,7 +290,7 @@ export const deleteMessage = async (req: Request, res: Response) => {
           statusCode: 401,
           code: "NOT_AUTHENTICATED",
         },
-      });
+      })
     }
 
     // Get the message
@@ -308,7 +308,7 @@ export const deleteMessage = async (req: Request, res: Response) => {
           },
         },
       },
-    });
+    })
 
     if (!message) {
       return res.status(404).json({
@@ -318,12 +318,12 @@ export const deleteMessage = async (req: Request, res: Response) => {
           statusCode: 404,
           code: "MESSAGE_NOT_FOUND",
         },
-      });
+      })
     }
 
     // Check if the user is the author or an admin of the channel
-    const isAuthor = message.userId === userId;
-    const isAdmin = message.channel.members.length > 0;
+    const isAuthor = message.userId === userId
+    const isAdmin = message.channel.members.length > 0
 
     if (!isAuthor && !isAdmin) {
       return res.status(403).json({
@@ -333,7 +333,7 @@ export const deleteMessage = async (req: Request, res: Response) => {
           statusCode: 403,
           code: "PERMISSION_DENIED",
         },
-      });
+      })
     }
 
     // Check if this is the channel's last message
@@ -349,7 +349,7 @@ export const deleteMessage = async (req: Request, res: Response) => {
         orderBy: {
           createdAt: "desc",
         },
-      });
+      })
 
       // Update the channel's lastMessageId
       await prisma.channel.update({
@@ -357,22 +357,22 @@ export const deleteMessage = async (req: Request, res: Response) => {
         data: {
           lastMessageId: previousMessage?.id || null,
         },
-      });
+      })
     }
 
     // Delete the message
     await prisma.message.delete({
       where: { id },
-    });
+    })
 
     res.status(200).json({
       success: true,
       data: {
         message: "Message deleted successfully",
       },
-    });
+    })
   } catch (error) {
-    console.error("Delete message error:", error);
+    console.error("Delete message error:", error)
     res.status(500).json({
       success: false,
       error: {
@@ -380,9 +380,9 @@ export const deleteMessage = async (req: Request, res: Response) => {
         statusCode: 500,
         code: "MESSAGE_DELETE_ERROR",
       },
-    });
+    })
   }
-};
+}
 
 /**
  * Add a reaction to a message
@@ -391,9 +391,9 @@ export const deleteMessage = async (req: Request, res: Response) => {
  */
 export const addReaction = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const { emoji } = req.body;
-    const userId = req.user?.id;
+    const { id } = req.params
+    const { emoji } = req.body
+    const userId = req.user?.id
 
     if (!userId) {
       return res.status(401).json({
@@ -403,7 +403,7 @@ export const addReaction = async (req: Request, res: Response) => {
           statusCode: 401,
           code: "NOT_AUTHENTICATED",
         },
-      });
+      })
     }
 
     // Check if the message exists
@@ -420,7 +420,7 @@ export const addReaction = async (req: Request, res: Response) => {
           },
         },
       },
-    });
+    })
 
     if (!message) {
       return res.status(404).json({
@@ -430,7 +430,7 @@ export const addReaction = async (req: Request, res: Response) => {
           statusCode: 404,
           code: "MESSAGE_NOT_FOUND",
         },
-      });
+      })
     }
 
     // Check if the user is a member of the channel
@@ -442,7 +442,7 @@ export const addReaction = async (req: Request, res: Response) => {
           statusCode: 403,
           code: "NOT_CHANNEL_MEMBER",
         },
-      });
+      })
     }
 
     // Create the reaction if it doesn't exist
@@ -468,14 +468,14 @@ export const addReaction = async (req: Request, res: Response) => {
           },
         },
       },
-    });
+    })
 
     res.status(201).json({
       success: true,
       data: reaction,
-    });
+    })
   } catch (error) {
-    console.error("Add reaction error:", error);
+    console.error("Add reaction error:", error)
     res.status(500).json({
       success: false,
       error: {
@@ -483,9 +483,9 @@ export const addReaction = async (req: Request, res: Response) => {
         statusCode: 500,
         code: "REACTION_ADD_ERROR",
       },
-    });
+    })
   }
-};
+}
 
 /**
  * Remove a reaction from a message
@@ -494,8 +494,8 @@ export const addReaction = async (req: Request, res: Response) => {
  */
 export const removeReaction = async (req: Request, res: Response) => {
   try {
-    const { id, emoji } = req.params;
-    const userId = req.user?.id;
+    const { id, emoji } = req.params
+    const userId = req.user?.id
 
     if (!userId) {
       return res.status(401).json({
@@ -505,7 +505,7 @@ export const removeReaction = async (req: Request, res: Response) => {
           statusCode: 401,
           code: "NOT_AUTHENTICATED",
         },
-      });
+      })
     }
 
     // Delete the reaction
@@ -515,16 +515,16 @@ export const removeReaction = async (req: Request, res: Response) => {
         userId,
         emoji,
       },
-    });
+    })
 
     res.status(200).json({
       success: true,
       data: {
         message: "Reaction removed successfully",
       },
-    });
+    })
   } catch (error) {
-    console.error("Remove reaction error:", error);
+    console.error("Remove reaction error:", error)
     res.status(500).json({
       success: false,
       error: {
@@ -532,6 +532,6 @@ export const removeReaction = async (req: Request, res: Response) => {
         statusCode: 500,
         code: "REACTION_REMOVE_ERROR",
       },
-    });
+    })
   }
-};
+}

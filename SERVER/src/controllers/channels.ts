@@ -1,5 +1,5 @@
-import { Request, Response } from "express";
-import { prisma } from "../index";
+import type { Request, Response } from "express"
+import { prisma } from "../index"
 
 /**
  * Create a new channel
@@ -8,7 +8,7 @@ import { prisma } from "../index";
  */
 export const createChannel = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.id
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -17,10 +17,10 @@ export const createChannel = async (req: Request, res: Response) => {
           statusCode: 401,
           code: "NOT_AUTHENTICATED",
         },
-      });
+      })
     }
 
-    const { name, description, type, isPrivate, memberIds } = req.body;
+    const { name, description, type, isPrivate, memberIds } = req.body
 
     // Validate channel type
     if (type !== "direct" && type !== "group") {
@@ -31,7 +31,7 @@ export const createChannel = async (req: Request, res: Response) => {
           statusCode: 400,
           code: "INVALID_CHANNEL_TYPE",
         },
-      });
+      })
     }
 
     /**
@@ -40,19 +40,15 @@ export const createChannel = async (req: Request, res: Response) => {
      *  that works best. But if you need to invite more in future, relax the check.
      *  For a typical one-on-one direct chat, pass exactly one user ID.)
      */
-    if (
-      type === "direct" &&
-      (!Array.isArray(memberIds) || memberIds.length < 1)
-    ) {
+    if (type === "direct" && (!Array.isArray(memberIds) || memberIds.length < 1)) {
       return res.status(400).json({
         success: false,
         error: {
-          message:
-            "Direct channels must have at least one recipient (pass exactly 1 ID for typical direct chat).",
+          message: "Direct channels must have at least one recipient (pass exactly 1 ID for typical direct chat).",
           statusCode: 400,
           code: "INVALID_MEMBERS_COUNT",
         },
-      });
+      })
     }
 
     // Check if direct channel already exists with these two users
@@ -94,14 +90,14 @@ export const createChannel = async (req: Request, res: Response) => {
             },
             lastMessage: true,
           },
-        });
+        })
 
         if (existingChannel) {
           // Return the existing channel if found
           return res.status(200).json({
             success: true,
             data: existingChannel,
-          });
+          })
         }
       }
     }
@@ -111,9 +107,7 @@ export const createChannel = async (req: Request, res: Response) => {
       data: {
         name:
           type === "direct" && memberIds.length === 1
-            ? (
-                await prisma.user.findUnique({ where: { id: memberIds[0] } })
-              )?.username || ""
+            ? (await prisma.user.findUnique({ where: { id: memberIds[0] } }))?.username || ""
             : name || "",
         description,
         type,
@@ -148,14 +142,14 @@ export const createChannel = async (req: Request, res: Response) => {
           },
         },
       },
-    });
+    })
 
     res.status(201).json({
       success: true,
       data: channel,
-    });
+    })
   } catch (error) {
-    console.error("Create channel error:", error);
+    console.error("Create channel error:", error)
     res.status(500).json({
       success: false,
       error: {
@@ -163,9 +157,9 @@ export const createChannel = async (req: Request, res: Response) => {
         statusCode: 500,
         code: "CHANNEL_CREATE_ERROR",
       },
-    });
+    })
   }
-};
+}
 
 /**
  * Get all channels for the authenticated user
@@ -174,7 +168,7 @@ export const createChannel = async (req: Request, res: Response) => {
  */
 export const getChannels = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.id
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -183,7 +177,7 @@ export const getChannels = async (req: Request, res: Response) => {
           statusCode: 401,
           code: "NOT_AUTHENTICATED",
         },
-      });
+      })
     }
 
     const channels = await prisma.channel.findMany({
@@ -213,14 +207,14 @@ export const getChannels = async (req: Request, res: Response) => {
       orderBy: {
         updatedAt: "desc",
       },
-    });
+    })
 
     res.status(200).json({
       success: true,
       data: channels,
-    });
+    })
   } catch (error) {
-    console.error("Get channels error:", error);
+    console.error("Get channels error:", error)
     res.status(500).json({
       success: false,
       error: {
@@ -228,9 +222,9 @@ export const getChannels = async (req: Request, res: Response) => {
         statusCode: 500,
         code: "CHANNELS_ERROR",
       },
-    });
+    })
   }
-};
+}
 
 /**
  * Get a channel by ID
@@ -239,8 +233,8 @@ export const getChannels = async (req: Request, res: Response) => {
  */
 export const getChannelById = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const userId = req.user?.id;
+    const { id } = req.params
+    const userId = req.user?.id
 
     if (!userId) {
       return res.status(401).json({
@@ -250,7 +244,7 @@ export const getChannelById = async (req: Request, res: Response) => {
           statusCode: 401,
           code: "NOT_AUTHENTICATED",
         },
-      });
+      })
     }
 
     // Check if the user is a member of the channel
@@ -305,7 +299,7 @@ export const getChannelById = async (req: Request, res: Response) => {
           },
         },
       },
-    });
+    })
 
     if (!channel) {
       return res.status(404).json({
@@ -315,15 +309,15 @@ export const getChannelById = async (req: Request, res: Response) => {
           statusCode: 404,
           code: "CHANNEL_NOT_FOUND",
         },
-      });
+      })
     }
 
     res.status(200).json({
       success: true,
       data: channel,
-    });
+    })
   } catch (error) {
-    console.error("Get channel error:", error);
+    console.error("Get channel error:", error)
     res.status(500).json({
       success: false,
       error: {
@@ -331,9 +325,9 @@ export const getChannelById = async (req: Request, res: Response) => {
         statusCode: 500,
         code: "CHANNEL_ERROR",
       },
-    });
+    })
   }
-};
+}
 
 /**
  * Update a channel
@@ -342,9 +336,9 @@ export const getChannelById = async (req: Request, res: Response) => {
  */
 export const updateChannel = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const userId = req.user?.id;
-    const { name, description, isPrivate } = req.body;
+    const { id } = req.params
+    const userId = req.user?.id
+    const { name, description, isPrivate } = req.body
 
     if (!userId) {
       return res.status(401).json({
@@ -354,7 +348,7 @@ export const updateChannel = async (req: Request, res: Response) => {
           statusCode: 401,
           code: "NOT_AUTHENTICATED",
         },
-      });
+      })
     }
 
     // Check if the user is an admin of the channel
@@ -364,7 +358,7 @@ export const updateChannel = async (req: Request, res: Response) => {
         userId,
         role: "admin",
       },
-    });
+    })
 
     if (!userMembership) {
       return res.status(403).json({
@@ -374,7 +368,7 @@ export const updateChannel = async (req: Request, res: Response) => {
           statusCode: 403,
           code: "PERMISSION_DENIED",
         },
-      });
+      })
     }
 
     // Update the channel
@@ -402,14 +396,14 @@ export const updateChannel = async (req: Request, res: Response) => {
         },
         lastMessage: true,
       },
-    });
+    })
 
     res.status(200).json({
       success: true,
       data: updatedChannel,
-    });
+    })
   } catch (error) {
-    console.error("Update channel error:", error);
+    console.error("Update channel error:", error)
     res.status(500).json({
       success: false,
       error: {
@@ -417,9 +411,9 @@ export const updateChannel = async (req: Request, res: Response) => {
         statusCode: 500,
         code: "CHANNEL_UPDATE_ERROR",
       },
-    });
+    })
   }
-};
+}
 
 /**
  * Delete a channel
@@ -428,8 +422,8 @@ export const updateChannel = async (req: Request, res: Response) => {
  */
 export const deleteChannel = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const userId = req.user?.id;
+    const { id } = req.params
+    const userId = req.user?.id
 
     if (!userId) {
       return res.status(401).json({
@@ -439,7 +433,7 @@ export const deleteChannel = async (req: Request, res: Response) => {
           statusCode: 401,
           code: "NOT_AUTHENTICATED",
         },
-      });
+      })
     }
 
     // Check if the user is an admin of the channel
@@ -449,7 +443,7 @@ export const deleteChannel = async (req: Request, res: Response) => {
         userId,
         role: "admin",
       },
-    });
+    })
 
     if (!userMembership) {
       return res.status(403).json({
@@ -459,13 +453,13 @@ export const deleteChannel = async (req: Request, res: Response) => {
           statusCode: 403,
           code: "PERMISSION_DENIED",
         },
-      });
+      })
     }
 
     // Check if it's a direct channel
     const channel = await prisma.channel.findUnique({
       where: { id },
-    });
+    })
 
     if (channel?.type === "direct") {
       return res.status(400).json({
@@ -475,22 +469,22 @@ export const deleteChannel = async (req: Request, res: Response) => {
           statusCode: 400,
           code: "INVALID_OPERATION",
         },
-      });
+      })
     }
 
     // Delete the channel
     await prisma.channel.delete({
       where: { id },
-    });
+    })
 
     res.status(200).json({
       success: true,
       data: {
         message: "Channel deleted successfully",
       },
-    });
+    })
   } catch (error) {
-    console.error("Delete channel error:", error);
+    console.error("Delete channel error:", error)
     res.status(500).json({
       success: false,
       error: {
@@ -498,9 +492,9 @@ export const deleteChannel = async (req: Request, res: Response) => {
         statusCode: 500,
         code: "CHANNEL_DELETE_ERROR",
       },
-    });
+    })
   }
-};
+}
 
 /**
  * Add a member to a channel
@@ -509,9 +503,9 @@ export const deleteChannel = async (req: Request, res: Response) => {
  */
 export const addChannelMember = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const { userId: memberToAddId, role = "member" } = req.body;
-    const userId = req.user?.id;
+    const { id } = req.params
+    const { userId: memberToAddId, role = "member" } = req.body
+    const userId = req.user?.id
 
     if (!userId) {
       return res.status(401).json({
@@ -521,7 +515,7 @@ export const addChannelMember = async (req: Request, res: Response) => {
           statusCode: 401,
           code: "NOT_AUTHENTICATED",
         },
-      });
+      })
     }
 
     // Check if the user is an admin of the channel
@@ -531,7 +525,7 @@ export const addChannelMember = async (req: Request, res: Response) => {
         userId,
         role: "admin",
       },
-    });
+    })
 
     if (!userMembership) {
       return res.status(403).json({
@@ -541,13 +535,13 @@ export const addChannelMember = async (req: Request, res: Response) => {
           statusCode: 403,
           code: "PERMISSION_DENIED",
         },
-      });
+      })
     }
 
     // Check if the channel is direct
     const channel = await prisma.channel.findUnique({
       where: { id },
-    });
+    })
 
     if (channel?.type === "direct") {
       return res.status(400).json({
@@ -557,7 +551,7 @@ export const addChannelMember = async (req: Request, res: Response) => {
           statusCode: 400,
           code: "INVALID_OPERATION",
         },
-      });
+      })
     }
 
     // Check if the member is already in the channel
@@ -566,7 +560,7 @@ export const addChannelMember = async (req: Request, res: Response) => {
         channelId: id,
         userId: memberToAddId,
       },
-    });
+    })
 
     if (existingMembership) {
       return res.status(400).json({
@@ -576,7 +570,7 @@ export const addChannelMember = async (req: Request, res: Response) => {
           statusCode: 400,
           code: "MEMBER_EXISTS",
         },
-      });
+      })
     }
 
     // Add the member
@@ -597,14 +591,14 @@ export const addChannelMember = async (req: Request, res: Response) => {
           },
         },
       },
-    });
+    })
 
     res.status(201).json({
       success: true,
       data: newMember,
-    });
+    })
   } catch (error) {
-    console.error("Add channel member error:", error);
+    console.error("Add channel member error:", error)
     res.status(500).json({
       success: false,
       error: {
@@ -612,9 +606,9 @@ export const addChannelMember = async (req: Request, res: Response) => {
         statusCode: 500,
         code: "ADD_MEMBER_ERROR",
       },
-    });
+    })
   }
-};
+}
 
 /**
  * Remove a member from a channel
@@ -623,8 +617,8 @@ export const addChannelMember = async (req: Request, res: Response) => {
  */
 export const removeChannelMember = async (req: Request, res: Response) => {
   try {
-    const { id, userId: memberToRemoveId } = req.params;
-    const userId = req.user?.id;
+    const { id, userId: memberToRemoveId } = req.params
+    const userId = req.user?.id
 
     if (!userId) {
       return res.status(401).json({
@@ -634,7 +628,7 @@ export const removeChannelMember = async (req: Request, res: Response) => {
           statusCode: 401,
           code: "NOT_AUTHENTICATED",
         },
-      });
+      })
     }
 
     // Check if the user is an admin of the channel or is removing themselves
@@ -647,7 +641,7 @@ export const removeChannelMember = async (req: Request, res: Response) => {
           { userId: memberToRemoveId }, // User can remove themselves
         ],
       },
-    });
+    })
 
     if (!userMembership) {
       return res.status(403).json({
@@ -657,13 +651,13 @@ export const removeChannelMember = async (req: Request, res: Response) => {
           statusCode: 403,
           code: "PERMISSION_DENIED",
         },
-      });
+      })
     }
 
     // Check if the channel is direct
     const channel = await prisma.channel.findUnique({
       where: { id },
-    });
+    })
 
     if (channel?.type === "direct") {
       return res.status(400).json({
@@ -673,7 +667,7 @@ export const removeChannelMember = async (req: Request, res: Response) => {
           statusCode: 400,
           code: "INVALID_OPERATION",
         },
-      });
+      })
     }
 
     // Remove the member
@@ -682,16 +676,16 @@ export const removeChannelMember = async (req: Request, res: Response) => {
         channelId: id,
         userId: memberToRemoveId,
       },
-    });
+    })
 
     res.status(200).json({
       success: true,
       data: {
         message: "Member removed successfully",
       },
-    });
+    })
   } catch (error) {
-    console.error("Remove channel member error:", error);
+    console.error("Remove channel member error:", error)
     res.status(500).json({
       success: false,
       error: {
@@ -699,6 +693,6 @@ export const removeChannelMember = async (req: Request, res: Response) => {
         statusCode: 500,
         code: "REMOVE_MEMBER_ERROR",
       },
-    });
+    })
   }
-};
+}

@@ -259,4 +259,4 @@ model Invitation {
   
   @@index([createdById])
   @@index([code])
-} 
+}
