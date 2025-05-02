@@ -1,30 +1,29 @@
-import React, { useRef, useEffect } from "react";
-import data from "@emoji-mart/data";
-import Picker from "@emoji-mart/react";
+"use client"
+
+import { useRef, useEffect } from "react"
+import data from "@emoji-mart/data"
+import Picker from "@emoji-mart/react"
 
 interface EmojiPickerProps {
-  onEmojiSelect: (emoji: string) => void;
-  onClose: () => void;
+  onEmojiSelect: (emoji: string) => void
+  onClose: () => void
 }
 
 export function EmojiPicker({ onEmojiSelect, onClose }: EmojiPickerProps) {
-  const pickerRef = useRef<HTMLDivElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (
-        pickerRef.current &&
-        !pickerRef.current.contains(event.target as Node)
-      ) {
-        onClose();
+      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+        onClose()
       }
     }
 
-    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside)
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [onClose]);
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [onClose])
 
   return (
     <div ref={pickerRef} className="absolute bottom-8 right-0 z-50">
@@ -37,5 +36,5 @@ export function EmojiPicker({ onEmojiSelect, onClose }: EmojiPickerProps) {
         maxFrequentRows={1}
       />
     </div>
-  );
+  )
 }
