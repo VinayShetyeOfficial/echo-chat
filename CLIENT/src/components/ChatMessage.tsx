@@ -1,49 +1,37 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+"use client";
+
+import type React from "react";
+import { useState, useEffect, useRef } from "react";
 import { UserAvatar } from "./UserAvatar";
-import {
-  format,
-  formatDistanceToNow,
-  isToday,
-  isYesterday,
-  differenceInMinutes,
-} from "date-fns";
+import { format, isToday, isYesterday, differenceInMinutes } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Trash2,
-  Pencil,
   SmilePlus,
   Check,
   X,
   Reply,
   MoreHorizontal,
   Edit,
-  LogOut,
-  FileText,
-  Download,
   Bold,
   Italic,
   Code,
   Strikethrough,
+  FileText,
+  Download,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useChat } from "@/contexts/ChatContext";
-import { AudioPlayer } from "./AudioPlayer";
-import { EmojiPicker } from "./EmojiPicker";
+import { cn } from "@/lib/utils";
+import type { Message, Attachment } from "../types";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
-import { Message, User, Attachment, Reaction } from "../types";
+import { AudioPlayer } from "./AudioPlayer";
 
 // Define ensureValidDate helper function here
 const ensureValidDate = (dateInput: any): Date => {
@@ -63,12 +51,7 @@ const ensureValidDate = (dateInput: any): Date => {
   }
 };
 
-interface ChatMessageProps {
-  message: Message;
-  onReply?: (message: Message) => void;
-}
-
-// Add a component to display attachments in a grid
+// Update the AttachmentGallery component to handle attachments properly
 function AttachmentGallery({ attachments }: { attachments: Attachment[] }) {
   const [selectedImage, setSelectedImage] = useState<Attachment | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
@@ -119,7 +102,7 @@ function AttachmentGallery({ attachments }: { attachments: Attachment[] }) {
       return (
         <div className="mb-2 max-w-[300px] rounded-lg overflow-hidden">
           <img
-            src={imageAttachments[0].url}
+            src={imageAttachments[0].url || "/placeholder.svg"}
             alt={imageAttachments[0].name}
             className="w-full h-auto object-cover cursor-pointer hover:opacity-90 transition-opacity"
             onClick={() => openLightbox(imageAttachments[0])}
@@ -130,10 +113,10 @@ function AttachmentGallery({ attachments }: { attachments: Attachment[] }) {
       // Two images - side by side
       return (
         <div className="mb-2 grid grid-cols-2 gap-1 max-w-[300px]">
-          {imageAttachments.map((attachment, index) => (
+          {imageAttachments.map((attachment) => (
             <div key={attachment.id} className="rounded-lg overflow-hidden">
               <img
-                src={attachment.url}
+                src={attachment.url || "/placeholder.svg"}
                 alt={attachment.name}
                 className="w-full h-32 object-cover cursor-pointer hover:opacity-90 transition-opacity"
                 onClick={() => openLightbox(attachment)}
@@ -148,7 +131,7 @@ function AttachmentGallery({ attachments }: { attachments: Attachment[] }) {
         <div className="mb-2 grid grid-cols-2 gap-1 max-w-[300px]">
           <div className="rounded-lg overflow-hidden">
             <img
-              src={imageAttachments[0].url}
+              src={imageAttachments[0].url || "/placeholder.svg"}
               alt={imageAttachments[0].name}
               className="w-full h-64 object-cover cursor-pointer hover:opacity-90 transition-opacity"
               onClick={() => openLightbox(imageAttachments[0])}
@@ -158,7 +141,7 @@ function AttachmentGallery({ attachments }: { attachments: Attachment[] }) {
             {imageAttachments.slice(1, 3).map((attachment) => (
               <div key={attachment.id} className="rounded-lg overflow-hidden">
                 <img
-                  src={attachment.url}
+                  src={attachment.url || "/placeholder.svg"}
                   alt={attachment.name}
                   className="w-full h-[31.5] object-cover cursor-pointer hover:opacity-90 transition-opacity"
                   onClick={() => openLightbox(attachment)}
@@ -178,7 +161,7 @@ function AttachmentGallery({ attachments }: { attachments: Attachment[] }) {
               className="relative rounded-lg overflow-hidden"
             >
               <img
-                src={attachment.url}
+                src={attachment.url || "/placeholder.svg"}
                 alt={attachment.name}
                 className="w-full h-32 object-cover cursor-pointer hover:opacity-90 transition-opacity"
                 onClick={() => openLightbox(attachment)}
@@ -243,7 +226,7 @@ function AttachmentGallery({ attachments }: { attachments: Attachment[] }) {
       >
         <div className="relative max-w-4xl max-h-[90vh]">
           <img
-            src={selectedImage.url}
+            src={selectedImage.url || "/placeholder.svg"}
             alt={selectedImage.name}
             className="max-w-full max-h-[90vh] object-contain"
           />
@@ -317,6 +300,11 @@ function AttachmentGallery({ attachments }: { attachments: Attachment[] }) {
       {renderLightbox()}
     </div>
   );
+}
+
+interface ChatMessageProps {
+  message: Message;
+  onReply?: (message: Message) => void;
 }
 
 export function ChatMessage({ message, onReply }: ChatMessageProps) {
@@ -571,36 +559,30 @@ export function ChatMessage({ message, onReply }: ChatMessageProps) {
           // Bold and Italic combined: *_text_*
           .replace(/\*_(.*?)_\*/g, '<span class="font-bold italic">$1</span>')
           // Italic and Bold combined: _*text*_
-          .replace(/\_\*(.*?)\*\_/g, '<span class="font-bold italic">$1</span>')
+          .replace(/_\*(.*?)\*_/g, '<span class="font-bold italic">$1</span>')
           // Strikethrough with Bold: ~*text*~
           .replace(
-            /\~\*(.*?)\*\~/g,
+            /~\*(.*?)\*~/g,
             '<span class="line-through font-bold">$1</span>'
           )
           // Bold with Strikethrough: *~text~*
           .replace(
-            /\*\~(.*?)\~\*/g,
+            /\*~(.*?)~\*/g,
             '<span class="line-through font-bold">$1</span>'
           )
           // Strikethrough with Italic: ~_text_~
-          .replace(
-            /\~\_(.*?)\_\~/g,
-            '<span class="line-through italic">$1</span>'
-          )
+          .replace(/~_(.*?)_~/g, '<span class="line-through italic">$1</span>')
           // Italic with Strikethrough: _~text~_
-          .replace(
-            /\_\~(.*?)\~\_/g,
-            '<span class="line-through italic">$1</span>'
-          )
+          .replace(/_~(.*?)~_/g, '<span class="line-through italic">$1</span>')
           // Bold: *text*
           .replace(/\*(.*?)\*/g, '<span class="font-bold">$1</span>')
           // Italic: _text_
-          .replace(/\_(.*?)\_/g, '<span class="italic">$1</span>')
+          .replace(/_(.*?)_/g, '<span class="italic">$1</span>')
           // Strikethrough: ~text~
-          .replace(/\~(.*?)\~/g, '<span class="line-through">$1</span>')
+          .replace(/~(.*?)~/g, '<span class="line-through">$1</span>')
           // Monospace (code): `text`
           .replace(
-            /\`(.*?)\`/g,
+            /`(.*?)`/g,
             '<span class="font-mono bg-[#1a222c66] px-1 py-0.5 rounded text-sm">$1</span>'
           )
       );
