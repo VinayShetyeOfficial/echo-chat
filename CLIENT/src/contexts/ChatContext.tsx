@@ -1,33 +1,28 @@
-import React, {
-  createContext,
-  useState,
-  useContext,
-  useEffect,
-  useMemo,
-} from "react";
-import {
+"use client";
+
+import type React from "react";
+import { createContext, useState, useContext, useEffect, useMemo } from "react";
+import type {
   Channel,
   User,
   Message,
-  Attachment,
-  Reaction,
   ChatContextType,
+  Attachment,
 } from "../types";
 import { useAuth } from "./AuthContext";
 import { toast as sonnerToast } from "sonner";
 import { CheckCircle } from "lucide-react";
 import {
   getChannels,
-  getMessagesForChannel,
-  sendMessage as apiSendMessage,
   updateMessage as apiUpdateMessage,
   deleteMessage as apiDeleteMessage,
   reactToMessage as apiReactToMessage,
   createChannel as apiCreateChannel,
 } from "@/lib/api";
-import { getToken } from "@/lib/auth";
-import { io, Socket } from "socket.io-client";
+import { io, type Socket } from "socket.io-client";
 import { messageApi } from "../lib/api";
+import { uploadFiles } from "@/lib/uploadFile";
+import axios from "axios";
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
@@ -117,7 +112,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
     };
 
     fetchChannels();
-  }, [user?.id]);
+  }, [user]);
 
   useEffect(() => {
     if (user) {
@@ -372,18 +367,33 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
     await fetchMessages(channel.id);
   };
 
+  // Update the sendMessage function in ChatContext to handle attachments properly
   const sendMessage = async (content: string, attachments: File[] = []) => {
     if (!activeChannel || !user) return;
 
     // 1. Create a temporary message object for optimistic update
     const tempId = `temp-${Date.now()}-${Math.random()}`;
+
+    // Create temporary attachments for optimistic UI update
+    const tempAttachments = attachments.map((file) => ({
+      id: `temp-${Date.now()}-${Math.random()}`,
+      type: file.type.startsWith("image/")
+        ? "image"
+        : file.type.startsWith("audio/")
+        ? "audio"
+        : "file",
+      url: URL.createObjectURL(file), // Create temporary URL for preview
+      name: file.name,
+      size: file.size,
+    }));
+
     const optimisticMessage: Message = {
       id: tempId, // Temporary ID
       text: content,
       sender: user, // Use the current logged-in user as the sender
       timestamp: new Date(),
       channelId: activeChannel.id,
-      attachments: [], // Handle attachments properly if needed
+      attachments: tempAttachments,
       reactions: [],
       isEdited: false,
       replyTo: activeReplyTo || undefined, // Include reply reference if exists
@@ -402,36 +412,55 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
     );
 
     try {
-      const messageData = {
-        text: content,
-        channelId: activeChannel.id,
-        attachments: [], // Send attachment data if implementing uploads
-        replyToId: activeReplyTo?.id, // Include replyToId if it exists
-      };
-
       // Clear the active reply after sending
       setActiveReplyTo(null);
 
       // DEBUG: Log the data being sent
-      console.log("[sendMessage] Sending data:", messageData);
-      if (!messageData.channelId) {
-        console.error("[sendMessage] Error: channelId is missing!");
-        throw new Error("Cannot send message: Channel ID is missing.");
-      }
-      if (!messageData.text) {
-        console.error("[sendMessage] Error: Message text is missing!");
-        throw new Error("Cannot send message: Message text is missing.");
-      }
+      console.log("[sendMessage] Sending message with:", {
+        text: content,
+        channelId: activeChannel.id,
+        attachments:
+          attachments.length > 0 ? `${attachments.length} files` : "none",
+        replyToId: activeReplyTo?.id,
+      });
 
-      // 3. Send via API
-      const apiResponse = await messageApi.sendMessage(messageData);
+      let savedMessageData;
 
-      // Extract the actual message data from the response
-      const savedMessageData = apiResponse.data;
+      // Handle file uploads if there are attachments
+      if (attachments.length > 0) {
+        try {
+          // Pass the user's actual message text instead of using default "Attachments"
+          const uploadResponse = await uploadFiles(
+            attachments,
+            activeChannel.id,
+            content,
+            activeReplyTo?.id
+          );
+          console.log(
+            "[sendMessage] Files uploaded successfully:",
+            uploadResponse
+          );
+
+          // The uploadFiles response already contains the complete message
+          // So we'll use this directly instead of creating another message
+          savedMessageData = uploadResponse;
+        } catch (uploadError) {
+          console.error("[sendMessage] Error uploading files:", uploadError);
+          throw new Error("Failed to upload files. Please try again.");
+        }
+      } else {
+        // For text-only messages, use the regular API
+        const apiResponse = await messageApi.sendMessage({
+          text: content,
+          channelId: activeChannel.id,
+          replyToId: activeReplyTo?.id,
+        });
+
+        savedMessageData = apiResponse.data;
+      }
 
       // Process the saved message data to ensure ID mapping and correct structure
       const processedSavedMessage: Message = {
-        // Spread the fields from savedMessageData, not the whole apiResponse
         id: savedMessageData._id || savedMessageData.id,
         text: savedMessageData.text || "", // Ensure text exists
         sender: savedMessageData.sender
@@ -443,8 +472,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
           : user, // Fallback to current user if sender is missing
         timestamp: new Date(
           savedMessageData.updatedAt || savedMessageData.createdAt || Date.now()
-        ), // Use correct timestamp fields
-        channelId: savedMessageData.channelId || activeChannel.id, // Ensure channelId exists
+        ),
+        channelId: savedMessageData.channelId || activeChannel.id,
         attachments: savedMessageData.attachments || [],
         reactions: savedMessageData.reactions || [],
         isEdited: savedMessageData.isEdited || false,
@@ -463,13 +492,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
                   }
                 : undefined,
             }
-          : undefined, // Add replyTo if it exists
+          : undefined,
       };
 
       // 4. Update the temporary message with the processed one from the server
       setMessages((prev) =>
         prev.map((msg) => (msg.id === tempId ? processedSavedMessage : msg))
       );
+
       // Also update the channel's lastMessage with the confirmed message
       setChannels((prevChannels) =>
         prevChannels.map((channel) =>
@@ -479,21 +509,30 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
         )
       );
 
-      // Socket event will handle updates for other users
-      // and potentially sync if needed, but sender sees message immediately
+      // Clean up temporary object URLs
+      tempAttachments.forEach((attachment) => {
+        if (attachment.url && attachment.url.startsWith("blob:")) {
+          URL.revokeObjectURL(attachment.url);
+        }
+      });
     } catch (err: any) {
       setError(err.message || "Failed to send message");
       console.error("Error sending message:", err);
+
       // 5. Remove the optimistic message if the API call failed
       setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+
+      // Clean up temporary object URLs
+      tempAttachments.forEach((attachment) => {
+        if (attachment.url && attachment.url.startsWith("blob:")) {
+          URL.revokeObjectURL(attachment.url);
+        }
+      });
+
       // Revert optimistic channel update on failure
       setChannels((prevChannels) =>
         prevChannels.map((channel) => {
           if (channel.id === activeChannel.id) {
-            // Find the previous last message before the optimistic one
-            // This requires fetching messages again or storing previous state, which is complex.
-            // For simplicity, we might just refetch channels or leave it slightly stale.
-            // Or, if messages state is sorted, take the second to last message.
             const messagesForChannel = messages.filter(
               (m) => m.channelId === channel.id && m.id !== tempId
             );
@@ -506,6 +545,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
           return channel;
         })
       );
+
       sonnerToast.error("Failed to send message. Please try again.");
     }
   };
@@ -745,24 +785,26 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   // Create context value with the additional replyTo state and functions
-  const contextValue = useMemo(
-    () => ({
-      channels,
-      activeChannel,
-      messages,
-      loading,
-      error,
-      setActiveChannel: handleSetActiveChannel,
-      sendMessage,
-      editMessage,
-      deleteMessage,
-      reactToMessage,
-      createChannel,
-      currentlyEditingId,
-      setCurrentlyEditingId,
-      activeReplyTo,
-      setActiveReplyTo,
-    }),
+  const contextValue = {
+    channels,
+    activeChannel,
+    messages,
+    loading,
+    error,
+    setActiveChannel: handleSetActiveChannel,
+    sendMessage,
+    editMessage,
+    deleteMessage,
+    reactToMessage,
+    createChannel,
+    currentlyEditingId,
+    setCurrentlyEditingId,
+    activeReplyTo,
+    setActiveReplyTo,
+  };
+
+  const memoizedContextValue = useMemo(
+    () => contextValue,
     [
       channels,
       activeChannel,
@@ -775,7 +817,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   return (
-    <ChatContext.Provider value={contextValue}>{children}</ChatContext.Provider>
+    <ChatContext.Provider value={memoizedContextValue}>
+      {children}
+    </ChatContext.Provider>
   );
 };
 
