@@ -1,34 +1,29 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User } from "@/types";
-import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import type { User } from "@/types"
+import { cn } from "@/lib/utils"
 
 export interface UserAvatarProps {
-  user?: User | null;
-  size?: "sm" | "md" | "lg";
-  className?: string;
-  showStatus?: boolean;
+  user?: User | null
+  size?: "sm" | "md" | "lg"
+  className?: string
+  showStatus?: boolean
 }
 
-export function UserAvatar({
-  user,
-  size = "md",
-  className,
-  showStatus = false,
-}: UserAvatarProps) {
+export function UserAvatar({ user, size = "md", className, showStatus = false }: UserAvatarProps) {
   const getSizeClass = () => {
     switch (size) {
       case "sm":
-        return "h-8 w-8";
+        return "h-8 w-8"
       case "lg":
-        return "h-12 w-12";
+        return "h-12 w-12"
       case "md":
       default:
-        return "h-10 w-10";
+        return "h-10 w-10"
     }
-  };
+  }
 
   const getInitials = (name: string | undefined) => {
-    if (!name) return "?";
+    if (!name) return "?"
 
     try {
       return name
@@ -36,28 +31,26 @@ export function UserAvatar({
         .map((part) => part[0])
         .join("")
         .toUpperCase()
-        .substring(0, 2);
+        .substring(0, 2)
     } catch (error) {
-      console.error("Error getting initials for name:", name);
-      return "?";
+      console.error("Error getting initials for name:", name)
+      return "?"
     }
-  };
+  }
 
   // Determine status class based on user's online status
   const getStatusClass = () => {
-    if (!user) return "bg-gray-400"; // Offline/unknown
-    return user.isOnline ? "bg-green-500" : "bg-gray-400"; // Online or offline
-  };
+    if (!user) return "bg-gray-400" // Offline/unknown
+    return user.isOnline ? "bg-green-500" : "bg-gray-400" // Online or offline
+  }
 
   // If no user is provided or user data is incomplete, show a placeholder
   if (!user || !user.username) {
     return (
       <Avatar className={cn(getSizeClass(), className)}>
-        <AvatarFallback className="bg-chat-primary/10 text-chat-primary font-medium">
-          ?
-        </AvatarFallback>
+        <AvatarFallback className="bg-chat-primary/10 text-chat-primary font-medium">?</AvatarFallback>
       </Avatar>
-    );
+    )
   }
 
   return (
@@ -71,12 +64,9 @@ export function UserAvatar({
       {/* Conditionally render status indicator based on showStatus prop */}
       {showStatus && size !== "sm" && (
         <span
-          className={cn(
-            "absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background",
-            getStatusClass()
-          )}
+          className={cn("absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background", getStatusClass())}
         />
       )}
     </div>
-  );
+  )
 }
