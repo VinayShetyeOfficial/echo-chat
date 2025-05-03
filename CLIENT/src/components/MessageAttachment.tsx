@@ -1,62 +1,59 @@
-import React, { useState, useEffect } from "react";
-import { Attachment } from "@/types";
-import { FileIcon, X } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { getFileUrl } from "@/lib/uploadFile";
+"use client"
+
+import { useState, useEffect } from "react"
+import type { Attachment } from "@/types"
+import { FileIcon, X } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { getFileUrl } from "@/lib/uploadFile"
 
 interface MessageAttachmentProps {
-  attachment: Attachment;
-  className?: string;
-  isPreview?: boolean;
-  onRemove?: () => void;
+  attachment: Attachment
+  className?: string
+  isPreview?: boolean
+  onRemove?: () => void
 }
 
-export function MessageAttachment({
-  attachment,
-  className,
-  isPreview,
-  onRemove,
-}: MessageAttachmentProps) {
-  const [isImageError, setIsImageError] = useState(false);
-  const [fileUrl, setFileUrl] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(true);
+export function MessageAttachment({ attachment, className, isPreview, onRemove }: MessageAttachmentProps) {
+  const [isImageError, setIsImageError] = useState(false)
+  const [fileUrl, setFileUrl] = useState<string>("")
+  const [isLoading, setIsLoading] = useState(true)
 
   // Load file data from the database
   useEffect(() => {
-    let isMounted = true;
-    setIsLoading(true);
+    let isMounted = true
+    setIsLoading(true)
 
     const loadFileData = async () => {
       try {
-        const url = await getFileUrl(attachment.url);
+        const url = await getFileUrl(attachment.url)
         if (isMounted) {
-          setFileUrl(url);
-          setIsLoading(false);
+          setFileUrl(url)
+          setIsLoading(false)
         }
       } catch (error) {
-        console.error("Error loading file:", error);
+        console.error("Error loading file:", error)
         if (isMounted) {
-          setIsImageError(true);
-          setIsLoading(false);
+          setIsImageError(true)
+          setIsLoading(false)
         }
       }
-    };
+    }
 
-    loadFileData();
+    loadFileData()
 
     return () => {
-      isMounted = false;
-    };
-  }, [attachment.url]);
+      isMounted = false
+    }
+  }, [attachment.url])
 
   // Use a placeholder for broken images
-  const imagePlaceholder = "/placeholders/broken-image.png";
+  const imagePlaceholder = "/placeholders/broken-image.png"
 
   // Handle image load error
   const handleImageError = () => {
-    console.error(`Failed to load image: ${attachment.url}`);
-    setIsImageError(true);
-  };
+    console.error(`Failed to load image: ${attachment.url}`)
+    setIsImageError(true)
+  }
 
   // Show loading state
   if (isLoading) {
@@ -64,7 +61,7 @@ export function MessageAttachment({
       <div className={cn("rounded-md bg-muted p-2 animate-pulse", className)}>
         <div className="h-20 w-full bg-muted-foreground/20 rounded"></div>
       </div>
-    );
+    )
   }
 
   // For images
@@ -74,7 +71,7 @@ export function MessageAttachment({
         className={cn(
           "group relative overflow-hidden rounded-md",
           isPreview ? "h-24 w-24" : "max-h-80 max-w-full",
-          className
+          className,
         )}
       >
         <img
@@ -82,9 +79,7 @@ export function MessageAttachment({
           alt={attachment.name || "Image attachment"}
           className={cn(
             "h-full w-full object-cover transition-all",
-            isPreview
-              ? "aspect-square object-cover"
-              : "max-h-80 rounded-md object-contain"
+            isPreview ? "aspect-square object-cover" : "max-h-80 rounded-md object-contain",
           )}
           onError={handleImageError}
         />
@@ -98,24 +93,14 @@ export function MessageAttachment({
           </button>
         )}
       </div>
-    );
+    )
   }
 
   // For audio
   if (attachment.type === "audio" && fileUrl) {
     return (
-      <div
-        className={cn(
-          "flex items-center gap-2 rounded-md border border-border bg-background p-2",
-          className
-        )}
-      >
-        <audio
-          controls
-          src={fileUrl}
-          className="h-8 max-w-full"
-          title={attachment.name || "Audio attachment"}
-        />
+      <div className={cn("flex items-center gap-2 rounded-md border border-border bg-background p-2", className)}>
+        <audio controls src={fileUrl} className="h-8 max-w-full" title={attachment.name || "Audio attachment"} />
         {isPreview && onRemove && (
           <button
             onClick={onRemove}
@@ -126,21 +111,14 @@ export function MessageAttachment({
           </button>
         )}
       </div>
-    );
+    )
   }
 
   // For other file types
   return (
-    <div
-      className={cn(
-        "flex items-center gap-2 rounded-md border border-border bg-background p-2",
-        className
-      )}
-    >
+    <div className={cn("flex items-center gap-2 rounded-md border border-border bg-background p-2", className)}>
       <FileIcon className="h-5 w-5 flex-shrink-0 text-primary" />
-      <span className="truncate text-sm">
-        {attachment.name || "File attachment"}
-      </span>
+      <span className="truncate text-sm">{attachment.name || "File attachment"}</span>
       {isPreview && onRemove && (
         <button
           onClick={onRemove}
@@ -151,5 +129,5 @@ export function MessageAttachment({
         </button>
       )}
     </div>
-  );
+  )
 }
