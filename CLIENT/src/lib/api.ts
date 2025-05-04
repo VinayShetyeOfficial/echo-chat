@@ -236,7 +236,7 @@ export const messageApi = {
       return { data: [] };
     }
   },
-  sendMessage: (data: {
+  sendMessage: async (data: {
     text: string;
     channelId: string;
     attachments?: any[];
@@ -733,74 +733,6 @@ export const getMessagesForChannel = async (
   }
 };
 
-export const sendMessage = async (
-  channelId: string,
-  content: string,
-  attachments: File[] = []
-) => {
-  try {
-    // Get current user
-    const currentUser = await getCurrentUser();
-
-    // Process attachments if any...
-
-    // Send message via API
-    const response = await apiClient.post("/messages", {
-      channelId,
-      content,
-      attachmentIds: [], // Or whatever you need for attachments
-    });
-    return response.data.data;
-  } catch (error) {
-    console.error("Error sending message:", error);
-    throw error;
-  }
-};
-
-// Helper functions to determine file metadata
-function getFileType(url: string): string {
-  // Extract file extension from URL
-  const extension = url.split(".").pop()?.toLowerCase();
-
-  // Determine type based on common extensions
-  if (["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(extension || "")) {
-    return "image";
-  } else if (["mp3", "wav", "ogg", "m4a"].includes(extension || "")) {
-    return "audio";
-  } else {
-    return "file";
-  }
-}
-
-function getFileName(url: string): string {
-  // Extract filename from URL
-  return url.split("/").pop() || "file";
-}
-
-function getMimeType(url: string): string {
-  // Basic MIME type detection based on extension
-  const extension = url.split(".").pop()?.toLowerCase();
-
-  const mimeTypes: Record<string, string> = {
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    gif: "image/gif",
-    webp: "image/webp",
-    svg: "image/svg+xml",
-    mp3: "audio/mpeg",
-    wav: "audio/wav",
-    ogg: "audio/ogg",
-    m4a: "audio/m4a",
-    pdf: "application/pdf",
-    doc: "application/msword",
-    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    txt: "text/plain",
-  };
-
-  return mimeTypes[extension || ""] || "application/octet-stream";
-}
-
 export const updateMessage = async (
   messageId: string,
   content: string
@@ -1076,4 +1008,98 @@ const transformApiMessages = (messages: any[]): Message[] => {
       replyTo: msg.replyTo,
     };
   });
+};
+
+// Add this function to handle file uploads
+export const uploadFile = async (
+  file: File
+): Promise<{
+  id: string;
+  url: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+}> => {
+  try {
+    // Create a FormData object to send the file
+    const formData = new FormData();
+    formData.append("files", file);
+
+    // Upload the file
+    const response = await axios.post(
+      `${import.meta.env.VITE_API_URL || "http://localhost:3001/api"}/uploads`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    );
+
+    // Return the first uploaded file's data
+    const uploadedFile = response.data.data[0];
+    return {
+      id: uploadedFile.id,
+      url: uploadedFile.url,
+      fileName: uploadedFile.fileName,
+      fileSize: uploadedFile.fileSize,
+      mimeType: uploadedFile.mimeType,
+      width: uploadedFile.width,
+      height: uploadedFile.height,
+      duration: uploadedFile.duration,
+    };
+  } catch (error) {
+    console.error("Error uploading file:", error);
+    throw error;
+  }
+};
+
+// Add this function to upload multiple files
+export const uploadFiles = async (
+  files: File[]
+): Promise<
+  Array<{
+    id: string;
+    url: string;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+    width?: number;
+    height?: number;
+    duration?: number;
+  }>
+> => {
+  try {
+    // Create a FormData object to send all files
+    const formData = new FormData();
+    Array.from(files).forEach((file) => {
+      formData.append("files", file);
+    });
+
+    // Upload all files at once
+    const response = await axios.post(
+      `${import.meta.env.VITE_API_URL || "http://localhost:3001/api"}/uploads`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    );
+
+    // Return the uploaded files' data
+    return response.data.data;
+  } catch (error) {
+    console.error("Error uploading files:", error);
+
+    // Fallback to uploading files one by one if batch upload fails
+    console.log("Falling back to individual file uploads...");
+    const uploadPromises = Array.from(files).map((file) => uploadFile(file));
+    return Promise.all(uploadPromises);
+  }
 };
