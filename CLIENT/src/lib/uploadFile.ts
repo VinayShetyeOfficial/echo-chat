@@ -4,7 +4,10 @@ import axios from "axios";
  * Upload a file to the server
  * This function uploads a file to the server's /api/uploads endpoint
  */
-export async function uploadFile(file: File): Promise<{
+export async function uploadFile(
+  file: File,
+  channelId: string
+): Promise<{
   id: string;
   url: string;
   fileName: string;
@@ -18,6 +21,8 @@ export async function uploadFile(file: File): Promise<{
     // Create a FormData object to send the file
     const formData = new FormData();
     formData.append("files", file);
+    formData.append("channelId", channelId);
+    formData.append("text", "Image attachment");
 
     // For images, get dimensions
     if (file.type.startsWith("image/")) {
@@ -35,7 +40,7 @@ export async function uploadFile(file: File): Promise<{
             const response = await axios.post(
               `${
                 import.meta.env.VITE_API_URL || "http://localhost:3001/api"
-              }/uploads`,
+              }/messages/upload`,
               formData,
               {
                 headers: {
@@ -68,7 +73,9 @@ export async function uploadFile(file: File): Promise<{
         img.onerror = () => {
           URL.revokeObjectURL(objectUrl);
           // If we can't load the image, upload without dimensions
-          uploadWithoutMetadata(file, formData).then(resolve).catch(reject);
+          uploadWithoutMetadata(file, formData, channelId)
+            .then(resolve)
+            .catch(reject);
         };
 
         img.src = objectUrl;
@@ -87,7 +94,7 @@ export async function uploadFile(file: File): Promise<{
             const response = await axios.post(
               `${
                 import.meta.env.VITE_API_URL || "http://localhost:3001/api"
-              }/uploads`,
+              }/messages/upload`,
               formData,
               {
                 headers: {
@@ -119,14 +126,16 @@ export async function uploadFile(file: File): Promise<{
         audio.onerror = () => {
           URL.revokeObjectURL(objectUrl);
           // If we can't load the audio, upload without duration
-          uploadWithoutMetadata(file, formData).then(resolve).catch(reject);
+          uploadWithoutMetadata(file, formData, channelId)
+            .then(resolve)
+            .catch(reject);
         };
 
         audio.src = objectUrl;
       });
     } else {
       // For other file types, upload without additional metadata
-      return uploadWithoutMetadata(file, formData);
+      return uploadWithoutMetadata(file, formData, channelId);
     }
   } catch (error) {
     console.error("Error uploading file:", error);
@@ -137,7 +146,8 @@ export async function uploadFile(file: File): Promise<{
 // Helper function to upload a file without additional metadata
 async function uploadWithoutMetadata(
   file: File,
-  formData?: FormData
+  formData?: FormData,
+  channelId?: string
 ): Promise<{
   id: string;
   url: string;
@@ -150,11 +160,17 @@ async function uploadWithoutMetadata(
     const data = formData || new FormData();
     if (!formData) {
       data.append("files", file);
+      if (channelId) {
+        data.append("channelId", channelId);
+      }
+      data.append("text", "File attachment");
     }
 
     // Upload the file
     const response = await axios.post(
-      `${import.meta.env.VITE_API_URL || "http://localhost:3001/api"}/uploads`,
+      `${
+        import.meta.env.VITE_API_URL || "http://localhost:3001/api"
+      }/messages/upload`,
       data,
       {
         headers: {
@@ -180,30 +196,33 @@ async function uploadWithoutMetadata(
 }
 
 /**
- * Upload multiple files and return their metadata
+ * Upload multiple files and return the complete message object from the server
  */
-export async function uploadFiles(files: File[]): Promise<
-  Array<{
-    id: string;
-    url: string;
-    fileName: string;
-    fileSize: number;
-    mimeType: string;
-    width?: number;
-    height?: number;
-    duration?: number;
-  }>
-> {
+export async function uploadFiles(
+  files: File[],
+  channelId: string,
+  messageText?: string,
+  replyToId?: string
+): Promise<any> {
   try {
     // Create a FormData object to send all files
     const formData = new FormData();
     Array.from(files).forEach((file) => {
       formData.append("files", file);
     });
+    formData.append("channelId", channelId);
+    formData.append("text", messageText || "Attachments");
+
+    // Add replyToId if provided
+    if (replyToId) {
+      formData.append("replyToId", replyToId);
+    }
 
     // Upload all files at once
     const response = await axios.post(
-      `${import.meta.env.VITE_API_URL || "http://localhost:3001/api"}/uploads`,
+      `${
+        import.meta.env.VITE_API_URL || "http://localhost:3001/api"
+      }/messages/upload`,
       formData,
       {
         headers: {
@@ -213,15 +232,14 @@ export async function uploadFiles(files: File[]): Promise<
       }
     );
 
-    // Return the uploaded files' data
+    // Return the complete message data
     return response.data.data;
   } catch (error) {
     console.error("Error uploading files:", error);
 
-    // Fallback to uploading files one by one if batch upload fails
-    console.log("Falling back to individual file uploads...");
-    const uploadPromises = Array.from(files).map((file) => uploadFile(file));
-    return Promise.all(uploadPromises);
+    // Since we can't create a complete message via individual uploads,
+    // we'll just re-throw the error
+    throw error;
   }
 }
 
