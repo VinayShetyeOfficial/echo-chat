@@ -1,107 +1,97 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
-import { redeemInvitation, getPublicInviteDetails } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { toast } from "sonner";
-import { Loader2, Check, X, UserPlus } from "lucide-react";
+import { useEffect, useState } from "react"
+import { useParams, useNavigate } from "react-router-dom"
+import { useAuth } from "@/contexts/AuthContext"
+import { redeemInvitation, getPublicInviteDetails } from "@/lib/api"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { toast } from "sonner"
+import { Loader2, Check, X, UserPlus } from "lucide-react"
 
 interface InviteData {
   invitation: {
-    code: string;
+    code: string
     createdBy: {
-      id: string;
-      username: string;
-      avatar?: string;
-    };
+      id: string
+      username: string
+      avatar?: string
+    }
     channel?: {
-      id: string;
-      name: string;
-      type: string;
-    };
-    expires: string;
-  };
+      id: string
+      name: string
+      type: string
+    }
+    expires: string
+  }
 }
 
 export default function InvitePage() {
-  const { code } = useParams<{ code: string }>();
-  const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [inviteData, setInviteData] = useState<InviteData | null>(null);
-  const [isRedeeming, setIsRedeeming] = useState(false);
+  const { code } = useParams<{ code: string }>()
+  const navigate = useNavigate()
+  const { isAuthenticated, user } = useAuth()
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [inviteData, setInviteData] = useState<InviteData | null>(null)
+  const [isRedeeming, setIsRedeeming] = useState(false)
 
   useEffect(() => {
     const checkInvitation = async () => {
       if (!code) {
-        setError("Invalid invitation link");
-        setIsLoading(false);
-        return;
+        setError("Invalid invitation link")
+        setIsLoading(false)
+        return
       }
 
       try {
         // Use the public endpoint which doesn't require authentication
-        const data = await getPublicInviteDetails(code);
-        setInviteData(data);
+        const data = await getPublicInviteDetails(code)
+        setInviteData(data)
       } catch (error: any) {
-        const message =
-          error.response?.data?.error?.message ||
-          "This invitation is invalid or has expired";
-        setError(message);
+        const message = error.response?.data?.error?.message || "This invitation is invalid or has expired"
+        setError(message)
       } finally {
-        setIsLoading(false);
+        setIsLoading(false)
       }
-    };
+    }
 
-    checkInvitation();
-  }, [code]);
+    checkInvitation()
+  }, [code])
 
   const handleRedeemInvite = async () => {
-    if (!code) return;
+    if (!code) return
 
     // If user is not authenticated, redirect to auth page with invite code
     if (!isAuthenticated) {
       // Redirect to auth page with invite code as parameter
-      navigate(`/auth?invite=${code}`);
-      return;
+      navigate(`/auth?invite=${code}`)
+      return
     }
 
-    setIsRedeeming(true);
+    setIsRedeeming(true)
 
     try {
-      const result = await redeemInvitation(code);
-      toast.success(result.message || "Invitation accepted successfully");
+      const result = await redeemInvitation(code)
+      toast.success(result.message || "Invitation accepted successfully")
 
       // Navigate to the channel if this was a channel invite
       if (result.channel) {
-        navigate(`/chat/${result.channel.id}`);
+        navigate(`/chat/${result.channel.id}`)
       } else {
-        navigate("/chat");
+        navigate("/chat")
       }
     } catch (error: any) {
-      const message =
-        error.response?.data?.error?.message || "Failed to accept invitation";
-      toast.error(message);
+      const message = error.response?.data?.error?.message || "Failed to accept invitation"
+      toast.error(message)
     } finally {
-      setIsRedeeming(false);
+      setIsRedeeming(false)
     }
-  };
+  }
 
   const handleCancel = () => {
-    navigate("/chat");
-  };
+    navigate("/chat")
+  }
 
   // Render loading state
   if (isLoading) {
@@ -112,7 +102,7 @@ export default function InvitePage() {
           <p className="text-white">Verifying invitation...</p>
         </div>
       </div>
-    );
+    )
   }
 
   // Render error state
@@ -134,7 +124,7 @@ export default function InvitePage() {
           </CardFooter>
         </Card>
       </div>
-    );
+    )
   }
 
   // Render invitation details
@@ -148,31 +138,23 @@ export default function InvitePage() {
                 <AvatarImage src={inviteData.invitation.createdBy.avatar} />
               ) : (
                 <AvatarFallback>
-                  {inviteData?.invitation?.createdBy?.username
-                    .charAt(0)
-                    .toUpperCase() || "?"}
+                  {inviteData?.invitation?.createdBy?.username.charAt(0).toUpperCase() || "?"}
                 </AvatarFallback>
               )}
             </Avatar>
           </div>
           <CardTitle className="text-2xl">You've been invited!</CardTitle>
           <CardDescription className="text-base mt-1">
-            <span className="font-medium">
-              {inviteData?.invitation?.createdBy?.username}
-            </span>
+            <span className="font-medium">{inviteData?.invitation?.createdBy?.username}</span>
             {" has invited you to join "}
-            {inviteData?.invitation?.channel
-              ? `the "${inviteData.invitation.channel.name}" channel`
-              : "Echo Chat"}
+            {inviteData?.invitation?.channel ? `the "${inviteData.invitation.channel.name}" channel` : "Echo Chat"}
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
           <div className="flex items-center justify-center gap-3 mb-4">
             <UserPlus className="h-5 w-5 text-primary" />
             <span className="text-sm">
-              {isAuthenticated
-                ? "Click accept to join"
-                : "You need to sign up or log in to accept this invitation"}
+              {isAuthenticated ? "Click accept to join" : "You need to sign up or log in to accept this invitation"}
             </span>
           </div>
         </CardContent>
@@ -180,11 +162,7 @@ export default function InvitePage() {
           <Button variant="outline" className="flex-1" onClick={handleCancel}>
             Cancel
           </Button>
-          <Button
-            className="flex-1"
-            disabled={isRedeeming}
-            onClick={handleRedeemInvite}
-          >
+          <Button className="flex-1" disabled={isRedeeming} onClick={handleRedeemInvite}>
             {isRedeeming ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -200,5 +178,5 @@ export default function InvitePage() {
         </CardFooter>
       </Card>
     </div>
-  );
+  )
 }
