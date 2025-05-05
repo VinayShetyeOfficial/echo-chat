@@ -1,12 +1,12 @@
+"use client"
 
-import { useAuth } from "@/contexts/AuthContext";
-import { Navigate } from "react-router-dom";
-import Auth from "./Auth";
-import Chat from "./Chat";
+import { useAuth } from "@/contexts/AuthContext"
+import Auth from "./Auth"
+import Chat from "./Chat"
 
 export default function Index() {
-  const { isAuthenticated, loading } = useAuth();
-  
+  const { isAuthenticated, loading } = useAuth()
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -17,8 +17,8 @@ export default function Index() {
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
-    );
+    )
   }
-  
-  return isAuthenticated ? <Chat /> : <Auth />;
+
+  return isAuthenticated ? <Chat /> : <Auth />
 }
