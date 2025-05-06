@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>API Test</title>
+</head>
+
+<body>
+    <h1>API Test</h1>
+
+    <button id="pingBtn">Test Ping</button>
+    <button id="signupBtn">Test Signup</button>
+    <button id="loginBtn">Test Login</button>
+
+    <pre id="result"></pre>
+
+    <script>
+        document.getElementById('pingBtn').addEventListener('click', async () => {
+            try {
+                const response = await fetch('http://127.0.0.1:3001/ping');
+                const text = await response.text();
+                document.getElementById('result').textContent = `Ping response: ${text}`;
+            } catch (error) {
+                document.getElementById('result').textContent = `Error: ${error.message}`;
+            }
+        });
+
+        document.getElementById('signupBtn').addEventListener('click', async () => {
+            try {
+                const response = await fetch('http://127.0.0.1:3001/api/auth/signup', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: 'testuser',
+                        email: 'test@example.com',
+                        password: 'password123'
+                    })
+                });
+
+                const data = await response.json();
+                document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('result').textContent = `Error: ${error.message}`;
+            }
+        });
+
+        document.getElementById('loginBtn').addEventListener('click', async () => {
+            try {
+                const response = await fetch('http://127.0.0.1:3001/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'vinay.shetye@gmail.com',
+                        password: 'Qwerty@53'
+                    })
+                });
+
+                const data = await response.json();
+                document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('result').textContent = `Error: ${error.message}`;
+            }
+        });
+    </script>
+</body>
+
+</html>
