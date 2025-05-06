@@ -1,56 +1,60 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import { X, FileText, Download } from "lucide-react"
-import { AudioPlayer } from "./AudioPlayer"
-import type { Attachment } from "@/types"
+import { useState } from "react";
+import { X, FileText, Download } from "lucide-react";
+import { AudioPlayer } from "./AudioPlayer";
+import type { Attachment } from "@/types";
 
 interface AttachmentGalleryProps {
-  attachments: Attachment[]
+  attachments: Attachment[];
 }
 
 export function AttachmentGallery({ attachments }: AttachmentGalleryProps) {
-  const [selectedImage, setSelectedImage] = useState<Attachment | null>(null)
-  const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0)
+  const [selectedImage, setSelectedImage] = useState<Attachment | null>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
 
   // Group attachments by type
-  const imageAttachments = attachments.filter((att) => att.type === "image")
-  const fileAttachments = attachments.filter((att) => att.type === "file" || att.type === "audio")
+  const imageAttachments = attachments.filter((att) => att.type === "image");
+  const fileAttachments = attachments.filter(
+    (att) => att.type === "file" || att.type === "audio"
+  );
 
   // Function to handle image click and show in a lightbox
   const openLightbox = (attachment: Attachment) => {
-    const index = imageAttachments.findIndex((img) => img.id === attachment.id)
-    setSelectedImageIndex(index >= 0 ? index : 0)
-    setSelectedImage(attachment)
-  }
+    const index = imageAttachments.findIndex((img) => img.id === attachment.id);
+    setSelectedImageIndex(index >= 0 ? index : 0);
+    setSelectedImage(attachment);
+  };
 
   const closeLightbox = () => {
-    setSelectedImage(null)
-  }
+    setSelectedImage(null);
+  };
 
   const goToNextImage = (e: React.MouseEvent) => {
-    e.stopPropagation() // Prevent lightbox from closing
-    if (imageAttachments.length <= 1) return
+    e.stopPropagation(); // Prevent lightbox from closing
+    if (imageAttachments.length <= 1) return;
 
-    const nextIndex = (selectedImageIndex + 1) % imageAttachments.length
-    setSelectedImageIndex(nextIndex)
-    setSelectedImage(imageAttachments[nextIndex])
-  }
+    const nextIndex = (selectedImageIndex + 1) % imageAttachments.length;
+    setSelectedImageIndex(nextIndex);
+    setSelectedImage(imageAttachments[nextIndex]);
+  };
 
   const goToPrevImage = (e: React.MouseEvent) => {
-    e.stopPropagation() // Prevent lightbox from closing
-    if (imageAttachments.length <= 1) return
+    e.stopPropagation(); // Prevent lightbox from closing
+    if (imageAttachments.length <= 1) return;
 
-    const prevIndex = (selectedImageIndex - 1 + imageAttachments.length) % imageAttachments.length
-    setSelectedImageIndex(prevIndex)
-    setSelectedImage(imageAttachments[prevIndex])
-  }
+    const prevIndex =
+      (selectedImageIndex - 1 + imageAttachments.length) %
+      imageAttachments.length;
+    setSelectedImageIndex(prevIndex);
+    setSelectedImage(imageAttachments[prevIndex]);
+  };
 
   // Create a grid layout based on number of images
   const renderImageGrid = () => {
-    if (imageAttachments.length === 0) return null
+    if (imageAttachments.length === 0) return null;
 
     if (imageAttachments.length === 1) {
       // Single image - larger display
@@ -63,7 +67,7 @@ export function AttachmentGallery({ attachments }: AttachmentGalleryProps) {
             onClick={() => openLightbox(imageAttachments[0])}
           />
         </div>
-      )
+      );
     } else if (imageAttachments.length === 2) {
       // Two images - side by side
       return (
@@ -79,7 +83,7 @@ export function AttachmentGallery({ attachments }: AttachmentGalleryProps) {
             </div>
           ))}
         </div>
-      )
+      );
     } else if (imageAttachments.length === 3) {
       // Three images - 1 large, 2 stacked
       return (
@@ -105,13 +109,16 @@ export function AttachmentGallery({ attachments }: AttachmentGalleryProps) {
             ))}
           </div>
         </div>
-      )
+      );
     } else {
       // 4+ images - 2x2 grid with +X indicator if more than 4
       return (
         <div className="mb-2 grid grid-cols-2 gap-1 max-w-[300px]">
           {imageAttachments.slice(0, 4).map((attachment, index) => (
-            <div key={attachment.id} className="relative rounded-lg overflow-hidden">
+            <div
+              key={attachment.id}
+              className="relative rounded-lg overflow-hidden"
+            >
               <img
                 src={attachment.url || "/placeholder.svg"}
                 alt={attachment.name}
@@ -129,25 +136,34 @@ export function AttachmentGallery({ attachments }: AttachmentGalleryProps) {
             </div>
           ))}
         </div>
-      )
+      );
     }
-  }
+  };
 
   // Render file attachments as a list
   const renderFileAttachments = () => {
-    if (fileAttachments.length === 0) return null
+    if (fileAttachments.length === 0) return null;
 
     return (
       <div className="mb-2 space-y-2">
         {fileAttachments.map((attachment) => (
-          <div key={attachment.id} className="flex items-center gap-2 p-2 rounded-md bg-gray-800/50 max-w-[300px]">
+          <div
+            key={attachment.id}
+            className="flex items-center gap-2 p-2 rounded-md bg-gray-800/50 max-w-[300px]"
+          >
             {attachment.type === "audio" ? (
               <AudioPlayer src={attachment.url} />
             ) : (
               <>
                 <FileText className="h-5 w-5 text-gray-400" />
-                <span className="text-sm truncate flex-1">{attachment.name}</span>
-                <a href={attachment.url} download={attachment.name} className="p-1 hover:bg-gray-700 rounded-md">
+                <span className="text-sm truncate flex-1">
+                  {attachment.name}
+                </span>
+                <a
+                  href={attachment.url}
+                  download={attachment.name}
+                  className="p-1 hover:bg-gray-700 rounded-md"
+                >
                   <Download className="h-4 w-4" />
                 </a>
               </>
@@ -155,15 +171,18 @@ export function AttachmentGallery({ attachments }: AttachmentGalleryProps) {
           </div>
         ))}
       </div>
-    )
-  }
+    );
+  };
 
   // Lightbox for viewing images
   const renderLightbox = () => {
-    if (!selectedImage) return null
+    if (!selectedImage) return null;
 
     return (
-      <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" onClick={closeLightbox}>
+      <div
+        className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+        onClick={closeLightbox}
+      >
         <div className="relative max-w-4xl max-h-[90vh]">
           <img
             src={selectedImage.url || "/placeholder.svg"}
@@ -173,8 +192,8 @@ export function AttachmentGallery({ attachments }: AttachmentGalleryProps) {
           <button
             className="absolute top-2 right-2 text-white bg-black/50 rounded-full p-1"
             onClick={(e) => {
-              e.stopPropagation()
-              closeLightbox()
+              e.stopPropagation();
+              closeLightbox();
             }}
           >
             <X className="h-6 w-6" />
@@ -230,8 +249,8 @@ export function AttachmentGallery({ attachments }: AttachmentGalleryProps) {
           )}
         </div>
       </div>
-    )
-  }
+    );
+  };
 
   return (
     <div className="space-y-2">
@@ -239,5 +258,5 @@ export function AttachmentGallery({ attachments }: AttachmentGalleryProps) {
       {renderFileAttachments()}
       {renderLightbox()}
     </div>
-  )
+  );
 }
