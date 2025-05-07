@@ -62,6 +62,33 @@ function AttachmentGallery({ attachments }: { attachments: Attachment[] }) {
     (att) => att.type === "file" || att.type === "audio"
   );
 
+  // Helper to get display name for attachments
+  const getDisplayName = (attachment: Attachment) => {
+    // First try fileName if it exists (this is the original uploaded filename)
+    if (attachment.fileName && attachment.fileName.trim() !== "") {
+      return attachment.fileName;
+    }
+
+    // Then check the attachment.name property
+    if (attachment.name && attachment.name.trim() !== "") {
+      return attachment.name;
+    }
+
+    // Extract filename from URL as a fallback
+    const urlParts = attachment.url.split("/");
+    const filenameWithParams = urlParts[urlParts.length - 1];
+    const filenameOnly = filenameWithParams.split("?")[0];
+
+    if (filenameOnly && filenameOnly.trim() !== "") {
+      return filenameOnly;
+    }
+
+    // Final fallback based on file type
+    if (attachment.type === "image") return "Image file";
+    if (attachment.type === "audio") return "Audio file";
+    return "File attachment";
+  };
+
   // Function to handle image click and show in a lightbox
   const openLightbox = (attachment: Attachment) => {
     const index = imageAttachments.findIndex((img) => img.id === attachment.id);
@@ -103,7 +130,7 @@ function AttachmentGallery({ attachments }: { attachments: Attachment[] }) {
         <div className="mb-2 max-w-[300px] rounded-lg overflow-hidden">
           <img
             src={imageAttachments[0].url || "/placeholder.svg"}
-            alt={imageAttachments[0].name}
+            alt={getDisplayName(imageAttachments[0])}
             className="w-full h-auto object-cover cursor-pointer hover:opacity-90 transition-opacity"
             onClick={() => openLightbox(imageAttachments[0])}
           />
@@ -117,7 +144,7 @@ function AttachmentGallery({ attachments }: { attachments: Attachment[] }) {
             <div key={attachment.id} className="rounded-lg overflow-hidden">
               <img
                 src={attachment.url || "/placeholder.svg"}
-                alt={attachment.name}
+                alt={getDisplayName(attachment)}
                 className="w-full h-32 object-cover cursor-pointer hover:opacity-90 transition-opacity"
                 onClick={() => openLightbox(attachment)}
               />
@@ -132,7 +159,7 @@ function AttachmentGallery({ attachments }: { attachments: Attachment[] }) {
           <div className="rounded-lg overflow-hidden">
             <img
               src={imageAttachments[0].url || "/placeholder.svg"}
-              alt={imageAttachments[0].name}
+              alt={getDisplayName(imageAttachments[0])}
               className="w-full h-64 object-cover cursor-pointer hover:opacity-90 transition-opacity"
               onClick={() => openLightbox(imageAttachments[0])}
             />
@@ -142,7 +169,7 @@ function AttachmentGallery({ attachments }: { attachments: Attachment[] }) {
               <div key={attachment.id} className="rounded-lg overflow-hidden">
                 <img
                   src={attachment.url || "/placeholder.svg"}
-                  alt={attachment.name}
+                  alt={getDisplayName(attachment)}
                   className="w-full h-[31.5] object-cover cursor-pointer hover:opacity-90 transition-opacity"
                   onClick={() => openLightbox(attachment)}
                 />
@@ -162,7 +189,7 @@ function AttachmentGallery({ attachments }: { attachments: Attachment[] }) {
             >
               <img
                 src={attachment.url || "/placeholder.svg"}
-                alt={attachment.name}
+                alt={getDisplayName(attachment)}
                 className="w-full h-32 object-cover cursor-pointer hover:opacity-90 transition-opacity"
                 onClick={() => openLightbox(attachment)}
               />
@@ -197,12 +224,12 @@ function AttachmentGallery({ attachments }: { attachments: Attachment[] }) {
             ) : (
               <>
                 <FileText className="h-5 w-5 text-gray-400" />
-                <span className="text-sm truncate flex-1">
-                  {attachment.name}
+                <span className="text-sm truncate flex-1 max-w-[180px]">
+                  {getDisplayName(attachment)}
                 </span>
                 <a
                   href={attachment.url}
-                  download={attachment.name}
+                  download={getDisplayName(attachment)}
                   className="p-1 hover:bg-gray-700 rounded-md"
                 >
                   <Download className="h-4 w-4" />
@@ -227,7 +254,7 @@ function AttachmentGallery({ attachments }: { attachments: Attachment[] }) {
         <div className="relative max-w-4xl max-h-[90vh]">
           <img
             src={selectedImage.url || "/placeholder.svg"}
-            alt={selectedImage.name}
+            alt={getDisplayName(selectedImage)}
             className="max-w-full max-h-[90vh] object-contain"
           />
           <button
@@ -239,6 +266,11 @@ function AttachmentGallery({ attachments }: { attachments: Attachment[] }) {
           >
             <X className="h-6 w-6" />
           </button>
+
+          {/* Image filename display */}
+          <div className="absolute top-4 left-4 bg-black/60 text-white px-3 py-1 rounded text-sm max-w-[80%] truncate">
+            {getDisplayName(selectedImage)}
+          </div>
 
           {/* Image counter indicator */}
           {imageAttachments.length > 1 && (
