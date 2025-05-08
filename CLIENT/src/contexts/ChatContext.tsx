@@ -376,7 +376,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // Create temporary attachments for optimistic UI update
     const tempAttachments = attachments.map((file) => ({
-      id: `temp-${Math.random().toString(36).substring(2, 9)}`,
+      id: `temp-${Date.now()}-${Math.random()}`,
       type: file.type.startsWith("image/")
         ? "image"
         : file.type.startsWith("audio/")
@@ -385,7 +385,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       url: URL.createObjectURL(file), // Create temporary URL for preview
       name: file.name,
       size: file.size,
-    })) as Attachment[];
+    }));
 
     const optimisticMessage: Message = {
       id: tempId, // Temporary ID
@@ -713,33 +713,6 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
 
       const channelName = isDirect ? recipient?.username : name;
 
-      // If it's a direct message, first check if there's an existing channel with this recipient
-      if (isDirect && recipient) {
-        // Look for an existing direct message channel with this recipient
-        const existingChannel = channels.find(
-          (c) =>
-            c.type === "direct" &&
-            c.members.some((m: any) => {
-              // Check if member has the same ID as the recipient
-              const memberId = m.id || m.userId;
-              return memberId === recipient.id;
-            })
-        );
-
-        if (existingChannel) {
-          // If found, set it as active and return it instead of creating a new one
-          setActiveChannel(existingChannel);
-
-          // Ensure messages are fetched for this channel
-          if (existingChannel.id) {
-            await fetchMessages(existingChannel.id);
-          }
-
-          sonnerToast.success(`Opened conversation with ${recipient.username}`);
-          return existingChannel;
-        }
-      }
-
       // Create channel via API
       const newCh = await apiCreateChannel(
         channelName!,
@@ -749,8 +722,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       );
 
       // For local display, create a properly formatted channel object
-      // Use type assertion to bypass TypeScript's strict typing
-      const processed = {
+      const processed: Channel = {
+        ...newCh,
         name: channelName!,
         unreadCount: 0,
         // For direct messages, ensure the members array contains valid User objects
@@ -780,9 +753,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
         id: newCh.id,
         description: newCh.description || undefined,
         lastMessage: newCh.lastMessage,
-      } as any as Channel;
+      };
 
-      // Ensure we don't add duplicate channels
       if (!channels.some((c) => c.id === processed.id)) {
         setChannels((prev) => [processed, ...prev]);
       }
