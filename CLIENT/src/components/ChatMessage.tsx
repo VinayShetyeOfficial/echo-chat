@@ -698,76 +698,8 @@ export function ChatMessage({ message, onReply }: ChatMessageProps) {
   // Popular emojis for quick reactions
   const quickReactions = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
-  // First, let's add a new function that will handle scrolling to the original message
-  const scrollToMessage = (messageId: string) => {
-    // Try to find the message element
-    let messageElement = document.getElementById(`message-${messageId}`);
-
-    // If the element isn't found, it might be outside the current view
-    // Let's add a small delay to retry finding it after possible DOM updates
-    if (!messageElement) {
-      // Add a visual indicator that we're looking for the message
-      const messagesContainer = document.querySelector(".custom-scrollbar");
-      if (messagesContainer) {
-        messagesContainer.scrollTo({ top: 0, behavior: "smooth" });
-      }
-
-      // Show feedback that we're searching
-      const feedbackToast = () => {
-        // Use any available toast system, or fallback to console
-        if (window.sonnerToast) {
-          window.sonnerToast.info("Finding message...");
-        } else {
-          console.log("Finding message...");
-        }
-      };
-
-      feedbackToast();
-
-      // Set a timeout to try again after scrolling up
-      setTimeout(() => {
-        messageElement = document.getElementById(`message-${messageId}`);
-        if (messageElement) {
-          messageElement.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-          });
-
-          // Add a temporary highlight effect
-          messageElement.classList.add("message-highlight");
-          setTimeout(() => {
-            messageElement.classList.remove("message-highlight");
-          }, 2000);
-        } else {
-          // If still not found, inform the user
-          if (window.sonnerToast) {
-            window.sonnerToast.error(
-              "Couldn't find the original message. It may have been deleted."
-            );
-          } else {
-            console.log("Couldn't find the original message");
-          }
-        }
-      }, 500);
-      return;
-    }
-
-    // If message is found immediately, scroll to it
-    messageElement.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-    });
-
-    // Add a temporary highlight effect
-    messageElement.classList.add("message-highlight");
-    setTimeout(() => {
-      messageElement.classList.remove("message-highlight");
-    }, 2000);
-  };
-
   return (
     <div
-      id={`message-${message.id}`}
       className={cn(
         "group transition-colors rounded-md px-4 py-2",
         isMenuOpen || isEditing ? "bg-gray-800/30" : "hover:bg-gray-800/30"
@@ -899,19 +831,10 @@ export function ChatMessage({ message, onReply }: ChatMessageProps) {
                     )}
                   >
                     {message.replyTo && (
-                      <div
-                        className="mb-2 border-l-4 border-purple-300 bg-[#00000036] px-3 py-2 rounded-md -mx-3 -mt-1 cursor-pointer hover:bg-[#00000050] transition-colors group/reply"
-                        onClick={() => scrollToMessage(message.replyTo.id)}
-                        title="Click to see original message"
-                      >
+                      <div className="mb-2 border-l-4 border-purple-300 bg-[#00000036] px-3 py-2 rounded-md -mx-3 -mt-1">
                         <div className="flex items-center">
-                          <span className="text-xs font-semibold text-purple-200 flex items-center gap-1">
-                            <span>
-                              {message.replyTo.sender?.username || "Unknown"}
-                            </span>
-                            <span className="text-[10px] opacity-0 group-hover/reply:opacity-100 transition-opacity">
-                              (click to view)
-                            </span>
+                          <span className="text-xs font-semibold text-purple-200">
+                            {message.replyTo.sender?.username || "Unknown"}
                           </span>
                         </div>
                         <div className="text-xs text-gray-300/90 break-words line-clamp-1 mr-2">
