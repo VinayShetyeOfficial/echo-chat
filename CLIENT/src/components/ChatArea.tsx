@@ -1,94 +1,108 @@
-"use client"
+"use client";
 
-import { useState, useRef, useEffect } from "react"
-import { ChatMessage } from "./ChatMessage"
-import { MessageInput } from "./MessageInput"
-import type { Message } from "../types"
-import { UserPlus } from "lucide-react"
-import { useChat } from "@/contexts/ChatContext"
+import { useState, useRef, useEffect } from "react";
+import { ChatMessage } from "./ChatMessage";
+import { MessageInput } from "./MessageInput";
+import type { Message } from "../types";
+import { UserPlus } from "lucide-react";
+import { useChat } from "@/contexts/ChatContext";
 
 interface ChatAreaProps {
-  messages: Message[]
-  onSendMessage: (text: string, attachments?: File[]) => void
-  onEditMessage: (id: string, text: string) => void
-  onDeleteMessage: (id: string) => void
+  messages: Message[];
+  onSendMessage: (text: string, attachments?: File[]) => void;
+  onEditMessage: (id: string, text: string) => void;
+  onDeleteMessage: (id: string) => void;
 }
 
-export function ChatArea({ messages, onSendMessage, onEditMessage, onDeleteMessage }: ChatAreaProps) {
+export function ChatArea({
+  messages,
+  onSendMessage,
+  onEditMessage,
+  onDeleteMessage,
+}: ChatAreaProps) {
   // Use context instead of local state for reply functionality
-  const { activeReplyTo, setActiveReplyTo } = useChat()
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const messagesContainerRef = useRef<HTMLDivElement>(null)
-  const [showScrollToBottom, setShowScrollToBottom] = useState(false)
+  const { activeReplyTo, setActiveReplyTo } = useChat();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
   // Check if user has scrolled up
   const handleScroll = () => {
     if (messagesContainerRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current
-      const isScrolledUp = scrollHeight - scrollTop - clientHeight > 100
-      setShowScrollToBottom(isScrolledUp)
+      const { scrollTop, scrollHeight, clientHeight } =
+        messagesContainerRef.current;
+      const isScrolledUp = scrollHeight - scrollTop - clientHeight > 100;
+      setShowScrollToBottom(isScrolledUp);
     }
-  }
+  };
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    scrollToBottom();
+  }, [messages]);
 
   // Initialize scroll event listener
   useEffect(() => {
-    const container = messagesContainerRef.current
+    const container = messagesContainerRef.current;
     if (container) {
-      container.addEventListener("scroll", handleScroll)
-      return () => container.removeEventListener("scroll", handleScroll)
+      container.addEventListener("scroll", handleScroll);
+      return () => container.removeEventListener("scroll", handleScroll);
     }
-  }, [])
+  }, []);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-    setShowScrollToBottom(false)
-  }
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    setShowScrollToBottom(false);
+  };
 
   const handleReply = (message: Message) => {
     // Store the full message object to ensure we have all the data we need
-    setActiveReplyTo(message)
-  }
+    setActiveReplyTo(message);
+  };
 
   const handleSendMessage = (text: string, attachments?: File[]) => {
     // Pass the message text to onSendMessage (the actual sending happens in ChatContext)
-    onSendMessage(text, attachments)
+    onSendMessage(text, attachments);
     // Context's setActiveReplyTo will be called in the sendMessage function
     // to reset after sending
-  }
+  };
 
   // Create a simplified version of the message for the MessageInput component
   const getSimplifiedReply = () => {
-    if (!activeReplyTo) return null
+    if (!activeReplyTo) return null;
 
     return {
       id: activeReplyTo.id,
       text: activeReplyTo.text,
       sender: activeReplyTo.sender.username,
-    }
-  }
+    };
+  };
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-gray-50 dark:bg-gray-900">
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-1">
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-1"
+      >
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center max-w-sm p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border">
               <UserPlus className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium mb-2">No messages yet</h3>
               <p className="text-muted-foreground text-sm mb-4">
-                Start the conversation by sending a message below. You can invite others from the sidebar.
+                Start the conversation by sending a message below. You can
+                invite others from the sidebar.
               </p>
             </div>
           </div>
         ) : (
           <>
             {messages.map((message) => (
-              <ChatMessage key={message.id} message={message} onReply={handleReply} />
+              <ChatMessage
+                key={message.id}
+                message={message}
+                onReply={handleReply}
+              />
             ))}
             {/* Extra padding div to ensure enough space at bottom for UI elements like emoji picker */}
             <div className="h-36 w-full" aria-hidden="true"></div>
@@ -124,5 +138,5 @@ export function ChatArea({ messages, onSendMessage, onEditMessage, onDeleteMessa
         onCancelReply={() => setActiveReplyTo(undefined)}
       />
     </div>
-  )
+  );
 }
