@@ -1,7 +1,14 @@
 "use client";
 
 import type React from "react";
-import { createContext, useState, useContext, useEffect, useMemo } from "react";
+import {
+  createContext,
+  useState,
+  useContext,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import type {
   Channel,
   User,
@@ -34,11 +41,19 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   const [activeChannel, setActiveChannel] = useState<Channel | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [channelSwitchLoading, setChannelSwitchLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentlyEditingId, setCurrentlyEditingId] = useState<string | null>(
     null
   );
   const [activeReplyTo, setActiveReplyTo] = useState<Message | null>(null);
+  const [messageCache, setMessageCache] = useState<Record<string, Message[]>>(
+    {}
+  );
+  // Track scroll positions for each channel
+  const [scrollPositions, setScrollPositions] = useState<
+    Record<string, number>
+  >({});
 
   const { user } = useAuth();
 
@@ -171,6 +186,12 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       // Update message list if it belongs to the active channel
       if (message.channelId === activeChannel?.id) {
         setMessages((prev) => [...prev, message]);
+
+        // Also update the message cache
+        setMessageCache((prev) => ({
+          ...prev,
+          [message.channelId]: [...(prev[message.channelId] || []), message],
+        }));
       }
 
       // Update the lastMessage for the corresponding channel in the sidebar
@@ -242,6 +263,22 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
         prev.map((m) => (m.id === updatedMessage.id ? updatedMessage : m))
       );
 
+      // Also update the message in the cache if it exists
+      if (updatedMessage.channelId) {
+        setMessageCache((prev) => {
+          // If we have cached messages for this channel
+          if (prev[updatedMessage.channelId]) {
+            return {
+              ...prev,
+              [updatedMessage.channelId]: prev[updatedMessage.channelId].map(
+                (m) => (m.id === updatedMessage.id ? updatedMessage : m)
+              ),
+            };
+          }
+          return prev;
+        });
+      }
+
       // Also update lastMessage in the channel list if this is the latest message
       setChannels((prevChannels) =>
         prevChannels.map((channel) => {
@@ -296,11 +333,30 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       console.log("No channel ID provided, skipping message fetch");
       setMessages([]);
       setLoading(false);
+      setChannelSwitchLoading(false);
+      return;
+    }
+
+    // Check if we have cached messages for this channel
+    if (messageCache[channelId]) {
+      console.log(
+        `[fetchMessages] Using cached messages for channel ${channelId}`
+      );
+      setMessages(messageCache[channelId]);
+      setChannelSwitchLoading(false);
       return;
     }
 
     try {
-      setLoading(true);
+      // Only set main loading on initial app load, otherwise use the less intrusive channelSwitchLoading
+      if (loading) {
+        // Keep the main loading state if we're in initial load
+        setLoading(true);
+      } else {
+        // Use the channel switch loading for transitions between channels
+        setChannelSwitchLoading(true);
+      }
+
       setError(null);
 
       const response = await messageApi.getMessages(channelId);
@@ -350,19 +406,37 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
         }))
       );
 
+      // Cache the processed messages
+      setMessageCache((prev) => ({
+        ...prev,
+        [channelId]: processedMessages,
+      }));
+
       setMessages(processedMessages);
     } catch (err: any) {
       setError(err.message || "Failed to fetch messages");
       console.error("Error fetching messages:", err);
     } finally {
       setLoading(false);
+      setChannelSwitchLoading(false);
     }
   };
 
   const handleSetActiveChannel = async (channel: Channel) => {
-    setMessages([]);
+    // Don't clear messages immediately to avoid flickering
     setActiveChannel(channel);
     console.log("Setting active channel:", channel.id, channel.type);
+
+    // Set the channel switch loading state (lighter weight than full loading)
+    setChannelSwitchLoading(true);
+
+    // If we have cached messages, set them immediately for a smoother transition
+    if (messageCache[channel.id]) {
+      setMessages(messageCache[channel.id]);
+    } else {
+      // Only clear messages if we don't have a cache (prevents flickering)
+      setMessages([]);
+    }
 
     await fetchMessages(channel.id);
   };
@@ -499,6 +573,16 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       setMessages((prev) =>
         prev.map((msg) => (msg.id === tempId ? processedSavedMessage : msg))
       );
+
+      // Also update the message cache for this channel
+      if (activeChannel?.id) {
+        setMessageCache((prev) => ({
+          ...prev,
+          [activeChannel.id]: (prev[activeChannel.id] || []).map((msg) =>
+            msg.id === tempId ? processedSavedMessage : msg
+          ),
+        }));
+      }
 
       // Also update the channel's lastMessage with the confirmed message
       setChannels((prevChannels) =>
@@ -684,6 +768,26 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
             : m
         )
       );
+
+      // Also update the message cache
+      if (activeChannel?.id) {
+        setMessageCache((prev) => {
+          if (prev[activeChannel.id]) {
+            return {
+              ...prev,
+              [activeChannel.id]: prev[activeChannel.id].map((m) =>
+                m.id === messageId
+                  ? {
+                      ...m,
+                      reactions: processedReactions,
+                    }
+                  : m
+              ),
+            };
+          }
+          return prev;
+        });
+      }
     } catch (err) {
       console.error("React to message error in context:", err);
       sonnerToast.error("Failed to update reaction");
@@ -730,8 +834,14 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
           // If found, set it as active and return it instead of creating a new one
           setActiveChannel(existingChannel);
 
-          // Ensure messages are fetched for this channel
-          if (existingChannel.id) {
+          // If we have cached messages, use them for a smoother transition
+          // otherwise fetch messages
+          if (messageCache[existingChannel.id]) {
+            setMessages(messageCache[existingChannel.id]);
+            // Still fetch in background to ensure latest messages
+            fetchMessages(existingChannel.id);
+          } else {
+            // Ensure messages are fetched for this channel
             await fetchMessages(existingChannel.id);
           }
 
@@ -812,12 +922,31 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // Functions to manage scroll positions
+  const saveScrollPosition = useCallback(
+    (channelId: string, position: number) => {
+      setScrollPositions((prev) => ({
+        ...prev,
+        [channelId]: position,
+      }));
+    },
+    []
+  );
+
+  const getScrollPosition = useCallback(
+    (channelId: string) => {
+      return scrollPositions[channelId] || 0;
+    },
+    [scrollPositions]
+  );
+
   // Create context value with the additional replyTo state and functions
   const contextValue = {
     channels,
     activeChannel,
     messages,
     loading,
+    channelSwitchLoading,
     error,
     setActiveChannel: handleSetActiveChannel,
     sendMessage,
@@ -829,6 +958,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
     setCurrentlyEditingId,
     activeReplyTo,
     setActiveReplyTo,
+    saveScrollPosition,
+    getScrollPosition,
   };
 
   const memoizedContextValue = useMemo(
@@ -838,9 +969,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       activeChannel,
       messages,
       loading,
+      channelSwitchLoading,
       error,
       currentlyEditingId,
       activeReplyTo,
+      scrollPositions,
     ]
   );
 
