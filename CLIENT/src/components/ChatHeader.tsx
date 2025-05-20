@@ -103,7 +103,7 @@ export function ChatHeader({
     : "Offline";
 
   return (
-    <div className="flex items-center gap-3 p-4 border-b">
+    <div className="flex items-center gap-3 p-4 border-b h-16">
       {currentChannel.type === "direct" ? (
         <UserAvatar user={recipient} size="md" showStatus={true} />
       ) : (
@@ -111,14 +111,19 @@ export function ChatHeader({
           #
         </div>
       )}
-      <div className="flex flex-col">
+      <div className="flex flex-col justify-center min-h-[40px]">
         <span className="font-semibold">
           {prefix}
           {displayName}
         </span>
-        {currentChannel.type === "direct" && (
+        {currentChannel.type === "direct" ? (
           <span className="text-sm text-muted-foreground text-left">
             {onlineStatus}
+          </span>
+        ) : (
+          <span className="text-sm text-muted-foreground text-left opacity-0">
+            {/* Hidden placeholder for consistent height */}
+            &nbsp;
           </span>
         )}
       </div>
