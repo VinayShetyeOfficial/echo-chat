@@ -85,6 +85,8 @@ export interface ChatContextType {
   setCurrentlyEditingId?: (id: string | null) => void;
   activeReplyTo: Message | null;
   setActiveReplyTo: (message: Message | null) => void;
+  saveScrollPosition: (channelId: string, position: number) => void;
+  getScrollPosition: (channelId: string) => number;
 }
 
 export type ThemeMode = "light" | "dark" | "system";
