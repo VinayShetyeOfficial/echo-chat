@@ -1,7 +1,14 @@
 "use client";
 
 import type React from "react";
-import { createContext, useState, useContext, useEffect, useMemo } from "react";
+import {
+  createContext,
+  useState,
+  useContext,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import type {
   Channel,
   User,
@@ -43,6 +50,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   const [messageCache, setMessageCache] = useState<Record<string, Message[]>>(
     {}
   );
+  // Track scroll positions for each channel
+  const [scrollPositions, setScrollPositions] = useState<
+    Record<string, number>
+  >({});
 
   const { user } = useAuth();
 
@@ -911,6 +922,24 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // Functions to manage scroll positions
+  const saveScrollPosition = useCallback(
+    (channelId: string, position: number) => {
+      setScrollPositions((prev) => ({
+        ...prev,
+        [channelId]: position,
+      }));
+    },
+    []
+  );
+
+  const getScrollPosition = useCallback(
+    (channelId: string) => {
+      return scrollPositions[channelId] || 0;
+    },
+    [scrollPositions]
+  );
+
   // Create context value with the additional replyTo state and functions
   const contextValue = {
     channels,
@@ -929,6 +958,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
     setCurrentlyEditingId,
     activeReplyTo,
     setActiveReplyTo,
+    saveScrollPosition,
+    getScrollPosition,
   };
 
   const memoizedContextValue = useMemo(
@@ -942,6 +973,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       error,
       currentlyEditingId,
       activeReplyTo,
+      scrollPositions,
     ]
   );
 
