@@ -80,6 +80,7 @@ export interface ChatContextType {
     isDirect?: boolean
   ) => Promise<Channel>;
   loading: boolean;
+  channelSwitchLoading: boolean;
   currentlyEditingId?: string | null;
   setCurrentlyEditingId?: (id: string | null) => void;
   activeReplyTo: Message | null;
