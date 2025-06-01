@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { ChatMessage } from "./ChatMessage";
 import { MessageInput } from "./MessageInput";
 import type { Message } from "../types";
@@ -21,25 +21,104 @@ export function ChatArea({
   onDeleteMessage,
 }: ChatAreaProps) {
   // Use context instead of local state for reply functionality
-  const { activeReplyTo, setActiveReplyTo, channelSwitchLoading } = useChat();
+  const {
+    activeReplyTo,
+    setActiveReplyTo,
+    channelSwitchLoading,
+    activeChannel,
+    saveScrollPosition,
+    getScrollPosition,
+  } = useChat();
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [initialScrollRestored, setInitialScrollRestored] = useState(false);
 
   // Check if user has scrolled up
-  const handleScroll = () => {
+  const handleScroll = useCallback(() => {
     if (messagesContainerRef.current) {
       const { scrollTop, scrollHeight, clientHeight } =
         messagesContainerRef.current;
+
+      // Save current scroll position
+      if (activeChannel?.id) {
+        saveScrollPosition(activeChannel.id, scrollTop);
+      }
+
       const isScrolledUp = scrollHeight - scrollTop - clientHeight > 100;
       setShowScrollToBottom(isScrolledUp);
     }
-  };
+  }, [activeChannel?.id, saveScrollPosition, setShowScrollToBottom]);
+
+  // Effect for restoring scroll position when switching channels
+  useEffect(() => {
+    if (
+      !activeChannel?.id ||
+      !messagesContainerRef.current ||
+      channelSwitchLoading
+    ) {
+      return;
+    }
+
+    // After channel switch loading is complete
+    if (
+      !channelSwitchLoading &&
+      messages.length > 0 &&
+      !initialScrollRestored
+    ) {
+      // Get saved scroll position for this channel
+      const savedPosition = getScrollPosition(activeChannel.id);
+
+      // If we have a saved position, restore it
+      if (savedPosition > 0) {
+        messagesContainerRef.current.scrollTop = savedPosition;
+        setInitialScrollRestored(true);
+      } else {
+        // If no saved position, scroll to bottom
+        scrollToBottom(false);
+        setInitialScrollRestored(true);
+      }
+    }
+  }, [
+    activeChannel?.id,
+    channelSwitchLoading,
+    messages.length,
+    initialScrollRestored,
+    getScrollPosition,
+  ]);
+
+  // Reset the initialScrollRestored flag when changing channels
+  useEffect(() => {
+    if (activeChannel?.id) {
+      setInitialScrollRestored(false);
+    }
+  }, [activeChannel?.id]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    // Don't scroll if we're in the process of restoring a scroll position
+    if (initialScrollRestored) {
+      if (messages.length > 0 && !channelSwitchLoading) {
+        // Check if the user is already at the bottom
+        const container = messagesContainerRef.current;
+        if (container) {
+          const { scrollTop, scrollHeight, clientHeight } = container;
+          const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+
+          // Only auto-scroll if user is already at the bottom
+          if (isAtBottom) {
+            scrollToBottom(true);
+          }
+        }
+      }
+    } else if (channelSwitchLoading || messages.length === 0) {
+      // For channel switches or initial load, handle in the other useEffect
+    } else {
+      // For new messages in the same channel, use smooth scrolling
+      scrollToBottom(true);
+    }
+  }, [messages, channelSwitchLoading, initialScrollRestored]);
 
   // Initialize scroll event listener
   useEffect(() => {
@@ -48,10 +127,18 @@ export function ChatArea({
       container.addEventListener("scroll", handleScroll);
       return () => container.removeEventListener("scroll", handleScroll);
     }
-  }, []);
+  }, [handleScroll]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = (smooth = true) => {
+    if (!messagesEndRef.current) return;
+
+    if (smooth) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    } else {
+      // Use instant scrolling (no animation)
+      messagesEndRef.current.scrollIntoView({ behavior: "auto" });
+    }
+
     setShowScrollToBottom(false);
   };
 
@@ -122,7 +209,7 @@ export function ChatArea({
       {showScrollToBottom && (
         <button
           className="absolute bottom-[5.58rem] right-6 z-10 bg-chat-primary text-white p-2 rounded-full shadow-md hover:bg-chat-primary/90 transition-colors"
-          onClick={scrollToBottom}
+          onClick={() => scrollToBottom(true)}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
