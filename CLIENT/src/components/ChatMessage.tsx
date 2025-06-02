@@ -688,7 +688,7 @@ export function ChatMessage({ message, onReply }: ChatMessageProps) {
             onClick={() => handleReaction(reaction.emoji)}
           >
             <span className="mr-1">{reaction.emoji}</span>
-            <span>{reaction.count}</span>
+            {reaction.count > 1 && <span>{reaction.count}</span>}
           </button>
         ))}
       </div>
