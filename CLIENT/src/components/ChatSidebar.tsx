@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Plus,
   X,
@@ -55,6 +55,7 @@ export function ChatSidebar({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { toast } = useToast();
   const [recipient, setRecipient] = useState<User | null>(null);
+  const [isTabTransitioning, setIsTabTransitioning] = useState(false);
 
   useEffect(() => {
     if (activeChannel && activeChannel.type === "direct" && user) {
@@ -221,6 +222,16 @@ export function ChatSidebar({
     ));
   }, [channels, activeChannel?.id, setActiveChannel]);
 
+  const handleTabChange = (tab: "all" | "direct" | "groups") => {
+    if (tab === activeTab) return;
+    setIsTabTransitioning(true);
+    setActiveTab(tab);
+    // Reset the transitioning state after animation completes
+    setTimeout(() => {
+      setIsTabTransitioning(false);
+    }, 400);
+  };
+
   return (
     <>
       {isOpen && (
@@ -315,9 +326,9 @@ export function ChatSidebar({
           </div>
         </div>
 
-        <div className="flex border-b border-gray-200 dark:border-gray-700">
+        <div className="flex border-b border-gray-200 dark:border-gray-700 relative">
           <button
-            onClick={() => setActiveTab("all")}
+            onClick={() => handleTabChange("all")}
             className={cn(
               "flex-1 py-2.5 text-sm font-medium transition-colors relative",
               activeTab === "all"
@@ -326,12 +337,9 @@ export function ChatSidebar({
             )}
           >
             All
-            {activeTab === "all" && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-chat-primary" />
-            )}
           </button>
           <button
-            onClick={() => setActiveTab("direct")}
+            onClick={() => handleTabChange("direct")}
             className={cn(
               "flex-1 py-2.5 text-sm font-medium transition-colors relative",
               activeTab === "direct"
@@ -340,12 +348,9 @@ export function ChatSidebar({
             )}
           >
             Direct
-            {activeTab === "direct" && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-chat-primary" />
-            )}
           </button>
           <button
-            onClick={() => setActiveTab("groups")}
+            onClick={() => handleTabChange("groups")}
             className={cn(
               "flex-1 py-2.5 text-sm font-medium transition-colors relative",
               activeTab === "groups"
@@ -354,10 +359,24 @@ export function ChatSidebar({
             )}
           >
             Groups
-            {activeTab === "groups" && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-chat-primary" />
-            )}
           </button>
+          {/* Single animated indicator */}
+          <div
+            className="absolute bottom-0 h-[2px] bg-chat-primary transition-all duration-400 ease-out"
+            style={{
+              left:
+                activeTab === "all"
+                  ? "0%"
+                  : activeTab === "direct"
+                  ? "33.333%"
+                  : "66.666%",
+              width: "33.333%",
+              transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+              transform: isTabTransitioning ? "scaleX(0.85)" : "scaleX(1)",
+              opacity: isTabTransitioning ? 0.8 : 1,
+              boxShadow: "0 0 2px rgba(124, 58, 237, 0.6)",
+            }}
+          />
         </div>
 
         {/* Buttons to create new direct or group channel */}
