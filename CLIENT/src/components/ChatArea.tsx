@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useLayoutEffect,
+} from "react";
 import { ChatMessage } from "./ChatMessage";
 import { MessageInput } from "./MessageInput";
 import type { Message } from "../types";
@@ -20,7 +26,6 @@ export function ChatArea({
   onEditMessage,
   onDeleteMessage,
 }: ChatAreaProps) {
-  // Use context instead of local state for reply functionality
   const {
     activeReplyTo,
     setActiveReplyTo,
@@ -34,6 +39,27 @@ export function ChatArea({
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [initialScrollRestored, setInitialScrollRestored] = useState(false);
+  const [contentVisible, setContentVisible] = useState(false);
+
+  // Show content after properly positioning the scroll
+  useEffect(() => {
+    // Short delay to ensure DOM is ready
+    const timer = setTimeout(() => {
+      setContentVisible(true);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [activeChannel?.id]);
+
+  // Use useLayoutEffect to position the scroll before painting
+  // This ensures we never see the scroll movement
+  useLayoutEffect(() => {
+    if (messagesContainerRef.current && messages.length > 0) {
+      // Immediately set scroll to bottom without animation
+      messagesContainerRef.current.scrollTop =
+        messagesContainerRef.current.scrollHeight;
+      setInitialScrollRestored(true);
+    }
+  }, [activeChannel?.id, messages]);
 
   // Check if user has scrolled up
   const handleScroll = useCallback(() => {
@@ -53,72 +79,17 @@ export function ChatArea({
 
   // Effect for restoring scroll position when switching channels
   useEffect(() => {
-    if (
-      !activeChannel?.id ||
-      !messagesContainerRef.current ||
-      channelSwitchLoading
-    ) {
+    if (!activeChannel?.id || !messagesContainerRef.current) {
       return;
     }
 
-    // After channel switch loading is complete
-    if (
-      !channelSwitchLoading &&
-      messages.length > 0 &&
-      !initialScrollRestored
-    ) {
-      // Get saved scroll position for this channel
-      const savedPosition = getScrollPosition(activeChannel.id);
-
-      // If we have a saved position, restore it
-      if (savedPosition > 0) {
-        messagesContainerRef.current.scrollTop = savedPosition;
-        setInitialScrollRestored(true);
-      } else {
-        // If no saved position, scroll to bottom
-        scrollToBottom(false);
-        setInitialScrollRestored(true);
-      }
+    // After channel switch loading is complete and we have messages
+    if (!channelSwitchLoading && messages.length > 0) {
+      // Immediately scroll to the bottom on channel change
+      messagesContainerRef.current.scrollTop =
+        messagesContainerRef.current.scrollHeight;
     }
-  }, [
-    activeChannel?.id,
-    channelSwitchLoading,
-    messages.length,
-    initialScrollRestored,
-    getScrollPosition,
-  ]);
-
-  // Reset the initialScrollRestored flag when changing channels
-  useEffect(() => {
-    if (activeChannel?.id) {
-      setInitialScrollRestored(false);
-    }
-  }, [activeChannel?.id]);
-
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    // Don't scroll if we're in the process of restoring a scroll position
-    if (initialScrollRestored) {
-      if (messages.length > 0 && !channelSwitchLoading) {
-        // Check if the user is already at the bottom
-        const container = messagesContainerRef.current;
-        if (container) {
-          const { scrollTop, scrollHeight, clientHeight } = container;
-          const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
-
-          // Only auto-scroll if user is already at the bottom
-          if (isAtBottom) {
-            scrollToBottom(true);
-          }
-        }
-      }
-    } else if (channelSwitchLoading || messages.length === 0) {
-      // For channel switches or initial load, handle in the other useEffect
-    } else {
-      // For new messages in the same channel, use smooth scrolling
-      scrollToBottom(true);
-    }
-  }, [messages, channelSwitchLoading, initialScrollRestored]);
+  }, [activeChannel?.id, channelSwitchLoading, messages.length]);
 
   // Initialize scroll event listener
   useEffect(() => {
@@ -142,19 +113,29 @@ export function ChatArea({
     setShowScrollToBottom(false);
   };
 
+  // Handle new message - only auto-scroll if we're already at bottom
+  useEffect(() => {
+    if (initialScrollRestored && messages.length > 0 && !channelSwitchLoading) {
+      const container = messagesContainerRef.current;
+      if (container) {
+        const { scrollTop, scrollHeight, clientHeight } = container;
+        const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+
+        if (isAtBottom) {
+          scrollToBottom(true);
+        }
+      }
+    }
+  }, [messages, channelSwitchLoading, initialScrollRestored]);
+
   const handleReply = (message: Message) => {
-    // Store the full message object to ensure we have all the data we need
     setActiveReplyTo(message);
   };
 
   const handleSendMessage = (text: string, attachments?: File[]) => {
-    // Pass the message text to onSendMessage (the actual sending happens in ChatContext)
     onSendMessage(text, attachments);
-    // Context's setActiveReplyTo will be called in the sendMessage function
-    // to reset after sending
   };
 
-  // Create a simplified version of the message for the MessageInput component
   const getSimplifiedReply = () => {
     if (!activeReplyTo) return null;
 
@@ -169,7 +150,10 @@ export function ChatArea({
     <div className="flex flex-col h-[calc(100vh-64px)] bg-gray-50 dark:bg-gray-900">
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-1 relative"
+        className={`flex-1 overflow-y-auto p-4 custom-scrollbar space-y-1 relative ${
+          contentVisible ? "opacity-100" : "opacity-0"
+        }`}
+        style={{ transition: "opacity 150ms ease-out" }}
       >
         {/* Channel switching loading indicator */}
         {channelSwitchLoading && (
