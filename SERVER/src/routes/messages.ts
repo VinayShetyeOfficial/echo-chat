@@ -5,6 +5,13 @@ import { Channel } from "../models/Channel";
 import { upload } from "../middleware/upload"; // Import the upload middleware
 import path from "path";
 import fs from "fs";
+import {
+  createMessage,
+  getMessages,
+  updateMessage,
+  deleteMessage,
+  reactToMessage,
+} from "../controllers/messages";
 
 const router = express.Router();
 
@@ -161,130 +168,7 @@ router.get("/", (req: Request, res: Response) => {
 });
 
 // Send a message
-router.post("/", (req: Request, res: Response) => {
-  const { text, channelId, attachments, replyToId } = req.body;
-  const userId = req.user?.id;
-
-  console.log("POST /messages received:", {
-    text: text?.substring(0, 20) + (text?.length > 20 ? "..." : ""),
-    channelId,
-    userId,
-    replyToId: replyToId
-      ? `${replyToId} (present)`
-      : "undefined (not replying)",
-  });
-
-  if (!userId) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  if (!channelId || !text) {
-    return res
-      .status(400)
-      .json({ message: "Channel ID and message text are required" });
-  }
-  // Process with async/await in a self-executing function
-  (async () => {
-    try {
-      // Check if user is a member of the channel
-      const channel = await Channel.findById(channelId);
-      if (!channel) {
-        return res.status(404).json({ message: "Channel not found" });
-      }
-
-      const isMember = channel.members.some(
-        (member) =>
-          member && member.userId && member.userId.toString() === userId
-      );
-
-      if (!isMember) {
-        return res
-          .status(403)
-          .json({ message: "You don't have access to this channel" });
-      }
-
-      // Create message object with base properties
-      const messageData: any = {
-        text,
-        sender: userId,
-        channelId,
-        attachments: attachments || [],
-      };
-
-      // Add replyTo reference if provided
-      if (replyToId) {
-        console.log(`Adding replyTo reference: ${replyToId}`);
-        messageData.replyTo = replyToId;
-
-        // Verify the reply message exists
-        try {
-          const replyMessage = await Message.findById(replyToId);
-          if (!replyMessage) {
-            console.warn(
-              `Warning: Replying to message ID ${replyToId} that doesn't exist`
-            );
-          } else {
-            console.log(
-              `Reply valid: Replying to message from ${replyMessage.sender}`
-            );
-          }
-        } catch (err) {
-          console.error(`Error checking reply message: ${err}`);
-        }
-      }
-
-      // Create message
-      const message = new Message(messageData);
-
-      await message.save();
-      console.log(`Message saved with ID: ${message._id}`);
-
-      // Update channel's lastMessage using findByIdAndUpdate
-      await Channel.findByIdAndUpdate(channelId, {
-        lastMessage: message._id,
-        // Optionally update the channel's updatedAt timestamp as well
-        updatedAt: new Date(),
-      });
-
-      // Populate sender info for response
-      await message.populate("sender");
-
-      // Populate replyTo message if it exists
-      if (message.replyTo) {
-        console.log(`Populating replyTo field for message: ${message._id}`);
-        await message.populate({
-          path: "replyTo",
-          populate: { path: "sender" },
-        });
-        // Access populated data safely
-        const replyToData = message.replyTo as any;
-        if (replyToData) {
-          console.log(`ReplyTo populated:`, {
-            replyToId: replyToData._id,
-            replyToText: replyToData.text?.substring(0, 20),
-            replyToSender: replyToData.sender?.username,
-          });
-        }
-      }
-
-      // Get the io instance from the request to emit the message
-      if (req.app.get("io")) {
-        req.app.get("io").to(channelId).emit("new_message", message);
-      }
-
-      return res.status(201).json({
-        message: "Message sent successfully",
-        data: message,
-      });
-    } catch (error: any) {
-      console.error("Error sending message:", error);
-      return res.status(500).json({
-        message: "Error sending message",
-        error: error.message,
-      });
-    }
-  })();
-});
+router.post("/", createMessage);
 
 // --- TEST GET ROUTE FOR /:messageId START ---
 /*

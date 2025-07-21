@@ -11,6 +11,9 @@ import channelRoutes from "./routes/channels";
 import messageRoutes from "./routes/messages";
 import { authMiddleware } from "./middleware/auth";
 import invitationRoutes from "./routes/invitations";
+import { redisClient } from "./config/redis";
+import { ConnectionCache } from "./services/connectionCache";
+import { SocketManager } from "./services/socketManager";
 
 // Initialize environment variables
 dotenv.config();
@@ -19,17 +22,14 @@ dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 
-// Initialize Socket.IO
-const io = new Server(httpServer, {
-  cors: {
-    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
-    methods: ["GET", "POST"],
-    credentials: true,
-  },
-});
+// Initialize Socket.IO with enhanced manager
+const socketManager = new SocketManager(httpServer);
 
 // Make io accessible to routes
-app.set("io", io);
+app.set("io", socketManager.getIO());
+
+// Make SocketManager accessible to controllers
+app.set("socketManager", socketManager);
 
 // Middleware
 app.use(
@@ -60,35 +60,6 @@ app.get("/", (_req, res) => {
 // Health check endpoint
 app.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok" });
-});
-
-// Socket.IO setup
-io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
-
-  // Authenticate socket connection
-  const token = socket.handshake.auth.token;
-  if (!token) {
-    socket.disconnect();
-    return;
-  }
-
-  // Join a channel
-  socket.on("join_channel", ({ channelId }) => {
-    console.log(`User ${socket.id} joined channel ${channelId}`);
-    socket.join(channelId);
-  });
-
-  // Leave a channel
-  socket.on("leave_channel", ({ channelId }) => {
-    console.log(`User ${socket.id} left channel ${channelId}`);
-    socket.leave(channelId);
-  });
-
-  // Disconnect
-  socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
-  });
 });
 
 // Add this after your existing routes
@@ -249,6 +220,131 @@ app.get("/api/debug", (req, res) => {
     environment: process.env.NODE_ENV,
     mongoConnected: mongoose.connection.readyState === 1,
   });
+});
+
+// Add Redis test routes
+app.get("/api/test/redis-set", async (req, res) => {
+  try {
+    await redisClient.set("test-key", "hello-redis");
+    console.log("[Redis] Set test-key = hello-redis");
+    res.json({ message: "Redis SET successful" });
+  } catch (err) {
+    console.error("[Redis] SET error:", err);
+    res.status(500).json({ error: "Redis SET failed" });
+  }
+});
+
+app.get("/api/test/redis-get", async (req, res) => {
+  try {
+    const value = await redisClient.get("test-key");
+    console.log("[Redis] Get test-key =", value);
+    res.json({ message: "Redis GET successful", value });
+  } catch (err) {
+    console.error("[Redis] GET error:", err);
+    res.status(500).json({ error: "Redis GET failed" });
+  }
+});
+
+// Add ConnectionCache test routes
+app.get("/api/test/connection-store", async (req, res) => {
+  try {
+    const userId = "test-user-123";
+    const socketId = "socket-456";
+    const serverId = "server-789";
+
+    await ConnectionCache.storeUserConnection(userId, socketId, serverId);
+    console.log("[ConnectionCache] Test: Stored user connection");
+    res.json({ message: "Connection stored successfully" });
+  } catch (err) {
+    console.error("[ConnectionCache] Test error:", err);
+    res.status(500).json({ error: "Connection store failed" });
+  }
+});
+
+app.get("/api/test/connection-get", async (req, res) => {
+  try {
+    const userId = "test-user-123";
+    const connection = await ConnectionCache.getUserConnection(userId);
+    const isOnline = await ConnectionCache.isUserOnline(userId);
+
+    console.log("[ConnectionCache] Test: Retrieved connection:", connection);
+    console.log("[ConnectionCache] Test: User online status:", isOnline);
+
+    res.json({
+      message: "Connection retrieved successfully",
+      connection,
+      isOnline,
+    });
+  } catch (err) {
+    console.error("[ConnectionCache] Test error:", err);
+    res.status(500).json({ error: "Connection get failed" });
+  }
+});
+
+app.get("/api/test/connection-remove", async (req, res) => {
+  try {
+    const userId = "test-user-123";
+    await ConnectionCache.removeUserConnection(userId);
+    console.log("[ConnectionCache] Test: Removed user connection");
+    res.json({ message: "Connection removed successfully" });
+  } catch (err) {
+    console.error("[ConnectionCache] Test error:", err);
+    res.status(500).json({ error: "Connection remove failed" });
+  }
+});
+
+app.get("/api/test/connection-online", async (req, res) => {
+  try {
+    const onlineUsers = await ConnectionCache.getOnlineUsers();
+    console.log("[ConnectionCache] Test: Online users:", onlineUsers);
+    res.json({
+      message: "Online users retrieved successfully",
+      onlineUsers,
+    });
+  } catch (err) {
+    console.error("[ConnectionCache] Test error:", err);
+    res.status(500).json({ error: "Online users get failed" });
+  }
+});
+
+// Add SocketManager test routes
+app.get("/api/test/socket-info", (req, res) => {
+  try {
+    const connectedUsers = socketManager.getConnectedUsers();
+    const serverId = socketManager.getServerId();
+
+    console.log("[SocketManager] Test: Server info requested");
+    res.json({
+      message: "Socket manager info retrieved successfully",
+      serverId,
+      connectedUsers,
+      totalConnected: connectedUsers.length,
+    });
+  } catch (err) {
+    console.error("[SocketManager] Test error:", err);
+    res.status(500).json({ error: "Socket info failed" });
+  }
+});
+
+app.get("/api/test/socket-users", (req, res) => {
+  try {
+    const connectedUsers = socketManager.getConnectedUsers();
+    const onlineUsers = connectedUsers.map((user) => ({
+      userId: user.userId,
+      username: user.username,
+      socketId: user.socketId,
+    }));
+
+    console.log("[SocketManager] Test: Connected users:", onlineUsers);
+    res.json({
+      message: "Connected users retrieved successfully",
+      users: onlineUsers,
+      count: onlineUsers.length,
+    });
+  } catch (err) {
+    console.error("[SocketManager] Test error:", err);
+    res.status(500).json({ error: "Users get failed" });
+  }
 });
 
 // Start server
