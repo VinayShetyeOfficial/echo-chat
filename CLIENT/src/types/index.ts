@@ -80,10 +80,13 @@ export interface ChatContextType {
     isDirect?: boolean
   ) => Promise<Channel>;
   loading: boolean;
+  channelSwitchLoading: boolean;
   currentlyEditingId?: string | null;
   setCurrentlyEditingId?: (id: string | null) => void;
   activeReplyTo: Message | null;
   setActiveReplyTo: (message: Message | null) => void;
+  saveScrollPosition: (channelId: string, position: number) => void;
+  getScrollPosition: (channelId: string) => number;
 }
 
 export type ThemeMode = "light" | "dark" | "system";

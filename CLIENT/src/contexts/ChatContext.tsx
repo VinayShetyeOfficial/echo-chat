@@ -1,7 +1,14 @@
 "use client";
 
 import type React from "react";
-import { createContext, useState, useContext, useEffect, useMemo } from "react";
+import {
+  createContext,
+  useState,
+  useContext,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import type {
   Channel,
   User,
@@ -34,11 +41,19 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   const [activeChannel, setActiveChannel] = useState<Channel | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [channelSwitchLoading, setChannelSwitchLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentlyEditingId, setCurrentlyEditingId] = useState<string | null>(
     null
   );
   const [activeReplyTo, setActiveReplyTo] = useState<Message | null>(null);
+  const [messageCache, setMessageCache] = useState<Record<string, Message[]>>(
+    {}
+  );
+  // Track scroll positions for each channel
+  const [scrollPositions, setScrollPositions] = useState<
+    Record<string, number>
+  >({});
 
   const { user } = useAuth();
 
@@ -117,7 +132,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     if (user) {
       const SOCKET_URL =
-        import.meta.env.VITE_API_URL || "http://localhost:3001";
+        import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
 
       const socketInstance = io(SOCKET_URL, {
         auth: {
@@ -170,7 +185,75 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Update message list if it belongs to the active channel
       if (message.channelId === activeChannel?.id) {
-        setMessages((prev) => [...prev, message]);
+        setMessages((prev) => {
+          // Check if message already exists to prevent duplicates
+          const messageExists = prev.some(
+            (existingMessage) => existingMessage.id === message.id
+          );
+
+          if (messageExists) {
+            console.log(
+              `[Socket] Message ${message.id} already exists, skipping duplicate`
+            );
+            return prev;
+          }
+
+          // Additional check: Look for messages with same text, sender, and recent timestamp
+          // This catches cases where optimistic message was replaced but Socket.IO message is still being added
+          const recentDuplicate = prev.some((existingMessage) => {
+            const sameText = existingMessage.text === message.text;
+            const sameSender = existingMessage.sender.id === message.sender.id;
+            const timeDiff = Math.abs(
+              existingMessage.timestamp.getTime() - message.timestamp.getTime()
+            );
+            const isRecent = timeDiff < 5000; // Within 5 seconds
+
+            return sameText && sameSender && isRecent;
+          });
+
+          if (recentDuplicate) {
+            console.log(
+              `[Socket] Recent duplicate message detected for text "${message.text}", skipping`
+            );
+            return prev;
+          }
+
+          console.log(`[Socket] Adding new message ${message.id} to UI`);
+          return [...prev, message];
+        });
+
+        // Also update the message cache
+        setMessageCache((prev) => {
+          const existingMessages = prev[message.channelId] || [];
+          const messageExists = existingMessages.some(
+            (existingMessage) => existingMessage.id === message.id
+          );
+
+          if (messageExists) {
+            return prev;
+          }
+
+          // Additional check: Look for messages with same text, sender, and recent timestamp
+          const recentDuplicate = existingMessages.some((existingMessage) => {
+            const sameText = existingMessage.text === message.text;
+            const sameSender = existingMessage.sender.id === message.sender.id;
+            const timeDiff = Math.abs(
+              existingMessage.timestamp.getTime() - message.timestamp.getTime()
+            );
+            const isRecent = timeDiff < 5000; // Within 5 seconds
+
+            return sameText && sameSender && isRecent;
+          });
+
+          if (recentDuplicate) {
+            return prev;
+          }
+
+          return {
+            ...prev,
+            [message.channelId]: [...existingMessages, message],
+          };
+        });
       }
 
       // Update the lastMessage for the corresponding channel in the sidebar
@@ -242,6 +325,22 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
         prev.map((m) => (m.id === updatedMessage.id ? updatedMessage : m))
       );
 
+      // Also update the message in the cache if it exists
+      if (updatedMessage.channelId) {
+        setMessageCache((prev) => {
+          // If we have cached messages for this channel
+          if (prev[updatedMessage.channelId]) {
+            return {
+              ...prev,
+              [updatedMessage.channelId]: prev[updatedMessage.channelId].map(
+                (m) => (m.id === updatedMessage.id ? updatedMessage : m)
+              ),
+            };
+          }
+          return prev;
+        });
+      }
+
       // Also update lastMessage in the channel list if this is the latest message
       setChannels((prevChannels) =>
         prevChannels.map((channel) => {
@@ -296,11 +395,30 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       console.log("No channel ID provided, skipping message fetch");
       setMessages([]);
       setLoading(false);
+      setChannelSwitchLoading(false);
+      return;
+    }
+
+    // Check if we have cached messages for this channel
+    if (messageCache[channelId]) {
+      console.log(
+        `[fetchMessages] Using cached messages for channel ${channelId}`
+      );
+      setMessages(messageCache[channelId]);
+      setChannelSwitchLoading(false);
       return;
     }
 
     try {
-      setLoading(true);
+      // Only set main loading on initial app load, otherwise use the less intrusive channelSwitchLoading
+      if (loading) {
+        // Keep the main loading state if we're in initial load
+        setLoading(true);
+      } else {
+        // Use the channel switch loading for transitions between channels
+        setChannelSwitchLoading(true);
+      }
+
       setError(null);
 
       const response = await messageApi.getMessages(channelId);
@@ -350,19 +468,37 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
         }))
       );
 
+      // Cache the processed messages
+      setMessageCache((prev) => ({
+        ...prev,
+        [channelId]: processedMessages,
+      }));
+
       setMessages(processedMessages);
     } catch (err: any) {
       setError(err.message || "Failed to fetch messages");
       console.error("Error fetching messages:", err);
     } finally {
       setLoading(false);
+      setChannelSwitchLoading(false);
     }
   };
 
   const handleSetActiveChannel = async (channel: Channel) => {
-    setMessages([]);
+    // Don't clear messages immediately to avoid flickering
     setActiveChannel(channel);
     console.log("Setting active channel:", channel.id, channel.type);
+
+    // Set the channel switch loading state (lighter weight than full loading)
+    setChannelSwitchLoading(true);
+
+    // If we have cached messages, set them immediately for a smoother transition
+    if (messageCache[channel.id]) {
+      setMessages(messageCache[channel.id]);
+    } else {
+      // Only clear messages if we don't have a cache (prevents flickering)
+      setMessages([]);
+    }
 
     await fetchMessages(channel.id);
   };
@@ -376,7 +512,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // Create temporary attachments for optimistic UI update
     const tempAttachments = attachments.map((file) => ({
-      id: `temp-${Date.now()}-${Math.random()}`,
+      id: `temp-${Math.random().toString(36).substring(2, 9)}`,
       type: file.type.startsWith("image/")
         ? "image"
         : file.type.startsWith("audio/")
@@ -385,7 +521,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       url: URL.createObjectURL(file), // Create temporary URL for preview
       name: file.name,
       size: file.size,
-    }));
+    })) as Attachment[];
 
     const optimisticMessage: Message = {
       id: tempId, // Temporary ID
@@ -499,6 +635,16 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       setMessages((prev) =>
         prev.map((msg) => (msg.id === tempId ? processedSavedMessage : msg))
       );
+
+      // Also update the message cache for this channel
+      if (activeChannel?.id) {
+        setMessageCache((prev) => ({
+          ...prev,
+          [activeChannel.id]: (prev[activeChannel.id] || []).map((msg) =>
+            msg.id === tempId ? processedSavedMessage : msg
+          ),
+        }));
+      }
 
       // Also update the channel's lastMessage with the confirmed message
       setChannels((prevChannels) =>
@@ -684,6 +830,26 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
             : m
         )
       );
+
+      // Also update the message cache
+      if (activeChannel?.id) {
+        setMessageCache((prev) => {
+          if (prev[activeChannel.id]) {
+            return {
+              ...prev,
+              [activeChannel.id]: prev[activeChannel.id].map((m) =>
+                m.id === messageId
+                  ? {
+                      ...m,
+                      reactions: processedReactions,
+                    }
+                  : m
+              ),
+            };
+          }
+          return prev;
+        });
+      }
     } catch (err) {
       console.error("React to message error in context:", err);
       sonnerToast.error("Failed to update reaction");
@@ -713,6 +879,39 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
 
       const channelName = isDirect ? recipient?.username : name;
 
+      // If it's a direct message, first check if there's an existing channel with this recipient
+      if (isDirect && recipient) {
+        // Look for an existing direct message channel with this recipient
+        const existingChannel = channels.find(
+          (c) =>
+            c.type === "direct" &&
+            c.members.some((m: any) => {
+              // Check if member has the same ID as the recipient
+              const memberId = m.id || m.userId;
+              return memberId === recipient.id;
+            })
+        );
+
+        if (existingChannel) {
+          // If found, set it as active and return it instead of creating a new one
+          setActiveChannel(existingChannel);
+
+          // If we have cached messages, use them for a smoother transition
+          // otherwise fetch messages
+          if (messageCache[existingChannel.id]) {
+            setMessages(messageCache[existingChannel.id]);
+            // Still fetch in background to ensure latest messages
+            fetchMessages(existingChannel.id);
+          } else {
+            // Ensure messages are fetched for this channel
+            await fetchMessages(existingChannel.id);
+          }
+
+          sonnerToast.success(`Opened conversation with ${recipient.username}`);
+          return existingChannel;
+        }
+      }
+
       // Create channel via API
       const newCh = await apiCreateChannel(
         channelName!,
@@ -722,8 +921,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       );
 
       // For local display, create a properly formatted channel object
-      const processed: Channel = {
-        ...newCh,
+      // Use type assertion to bypass TypeScript's strict typing
+      const processed = {
         name: channelName!,
         unreadCount: 0,
         // For direct messages, ensure the members array contains valid User objects
@@ -753,8 +952,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
         id: newCh.id,
         description: newCh.description || undefined,
         lastMessage: newCh.lastMessage,
-      };
+      } as any as Channel;
 
+      // Ensure we don't add duplicate channels
       if (!channels.some((c) => c.id === processed.id)) {
         setChannels((prev) => [processed, ...prev]);
       }
@@ -784,12 +984,31 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // Functions to manage scroll positions
+  const saveScrollPosition = useCallback(
+    (channelId: string, position: number) => {
+      setScrollPositions((prev) => ({
+        ...prev,
+        [channelId]: position,
+      }));
+    },
+    []
+  );
+
+  const getScrollPosition = useCallback(
+    (channelId: string) => {
+      return scrollPositions[channelId] || 0;
+    },
+    [scrollPositions]
+  );
+
   // Create context value with the additional replyTo state and functions
   const contextValue = {
     channels,
     activeChannel,
     messages,
     loading,
+    channelSwitchLoading,
     error,
     setActiveChannel: handleSetActiveChannel,
     sendMessage,
@@ -801,6 +1020,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
     setCurrentlyEditingId,
     activeReplyTo,
     setActiveReplyTo,
+    saveScrollPosition,
+    getScrollPosition,
   };
 
   const memoizedContextValue = useMemo(
@@ -810,9 +1031,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       activeChannel,
       messages,
       loading,
+      channelSwitchLoading,
       error,
       currentlyEditingId,
       activeReplyTo,
+      scrollPositions,
     ]
   );
 

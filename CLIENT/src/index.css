@@ -160,6 +160,24 @@
     animation: fadeIn 0.3s ease forwards;
   }
 
+  /* Animation for message highlight when scrolled to */
+  .message-highlight {
+    animation: highlightPulse 2s ease-in-out;
+    position: relative;
+  }
+
+  @keyframes highlightPulse {
+    0% {
+      background-color: rgba(168, 85, 247, 0);
+    }
+    30% {
+      background-color: rgba(168, 85, 247, 0.2);
+    }
+    100% {
+      background-color: rgba(168, 85, 247, 0);
+    }
+  }
+
   @keyframes fadeIn {
     from {
       opacity: 0;

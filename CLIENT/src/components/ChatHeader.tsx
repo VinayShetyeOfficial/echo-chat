@@ -1,108 +1,130 @@
-"use client"
+"use client";
 
-import { useMemo } from "react"
-import { useChat } from "@/contexts/ChatContext"
-import { useAuth } from "@/contexts/AuthContext"
-import { UserAvatar } from "./UserAvatar"
-import { useSettings } from "@/contexts/SettingsContext"
-import { SettingsDialog } from "./SettingsDialog"
+import { useMemo, useState } from "react";
+import { useChat } from "@/contexts/ChatContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { UserAvatar } from "./UserAvatar";
+import { useSettings } from "@/contexts/SettingsContext";
+import { SettingsDialog } from "./SettingsDialog";
 
 interface ChatHeaderProps {
-  onToggleSidebar: () => void // Assuming this exists if needed
+  onToggleSidebar?: () => void; // Make optional
+  channel?: any; // Add channel
+  onSearchMessages?: (query: string) => void; // Add search function
+  onToggleMobileMenu?: () => void; // Add mobile menu toggle
 }
 
-export function ChatHeader({ onToggleSidebar }: ChatHeaderProps) {
-  const { activeChannel } = useChat()
-  const { user } = useAuth()
-  const { isSettingsOpen, setIsSettingsOpen } = useSettings()
+export function ChatHeader({
+  onToggleSidebar,
+  channel,
+  onSearchMessages,
+  onToggleMobileMenu,
+}: ChatHeaderProps) {
+  const { activeChannel } = useChat();
+  // Use provided channel or activeChannel from context
+  const currentChannel = channel || activeChannel;
+  const { user } = useAuth();
+  const settings = useSettings();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Use a comprehensive and safer approach to find the recipient
   const recipient = useMemo(() => {
-    if (!activeChannel || activeChannel.type !== "direct" || !user) {
-      return null
+    if (!currentChannel || currentChannel.type !== "direct" || !user) {
+      return null;
     }
 
     try {
       // Cast members to any[] to avoid TypeScript errors
-      const members = activeChannel.members as any[]
+      const members = currentChannel.members as any[];
 
       // Find the member that's not the current user
       const otherMember = members.find((member) => {
-        if (!member) return false
+        if (!member) return false;
 
         // If it has userId property (ChannelMember)
         if (member.userId && member.userId !== user.id) {
-          return true
+          return true;
         }
 
         // If it's a User object with id
         if (member.id && member.id !== user.id) {
-          return true
+          return true;
         }
 
-        return false
-      })
+        return false;
+      });
 
       if (otherMember) {
         // Case 1: Member has a user property with user data
         if (otherMember.user && otherMember.user.username) {
-          return otherMember.user
+          return otherMember.user;
         }
 
         // Case 2: Member is a User object directly
         if (otherMember.username) {
-          return otherMember
+          return otherMember;
         }
       }
     } catch (error) {
-      console.error("Error finding recipient in ChatHeader:", error)
+      console.error("Error finding recipient in ChatHeader:", error);
     }
 
-    return null
-  }, [activeChannel, user])
+    return null;
+  }, [currentChannel, user]);
 
-  if (!activeChannel) {
-    return null
+  if (!currentChannel) {
+    return null;
   }
 
   // Calculate display name based on recipient or channel name
-  let displayName: string
-  let prefix = ""
+  let displayName: string;
+  let prefix = "";
 
-  if (activeChannel.type === "direct") {
+  if (currentChannel.type === "direct") {
     if (recipient && recipient.username) {
-      displayName = recipient.username
-    } else if (activeChannel.name) {
-      displayName = activeChannel.name
+      displayName = recipient.username;
+    } else if (currentChannel.name) {
+      displayName = currentChannel.name;
     } else {
-      displayName = "Unknown User"
-      prefix = "#" // Add hash to unknown users to indicate it's a system default
+      displayName = "Unknown User";
+      prefix = "#"; // Add hash to unknown users to indicate it's a system default
     }
   } else {
     // For group channels
-    displayName = activeChannel.name || "Unnamed Channel"
-    prefix = "#"
+    displayName = currentChannel.name || "Unnamed Channel";
+    prefix = "#";
   }
 
   // Get online status from recipient if available, with fallback
-  const onlineStatus = recipient ? (recipient.isOnline ? "Online" : "Offline") : "Offline"
+  const onlineStatus = recipient
+    ? recipient.isOnline
+      ? "Online"
+      : "Offline"
+    : "Offline";
 
   return (
-    <div className="flex items-center gap-3 p-4 border-b">
-      {activeChannel.type === "direct" ? (
+    <div className="flex items-center gap-3 p-4 border-b h-16">
+      {currentChannel.type === "direct" ? (
         <UserAvatar user={recipient} size="md" showStatus={true} />
       ) : (
         <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chat-primary/10 text-chat-primary">
           #
         </div>
       )}
-      <div className="flex flex-col">
+      <div className="flex flex-col justify-center min-h-[40px]">
         <span className="font-semibold">
           {prefix}
           {displayName}
         </span>
-        {activeChannel.type === "direct" && (
-          <span className="text-sm text-muted-foreground text-left">{onlineStatus}</span>
+        {currentChannel.type === "direct" ? (
+          <span className="text-sm text-muted-foreground text-left">
+            {onlineStatus}
+          </span>
+        ) : (
+          <span className="text-sm text-muted-foreground text-left opacity-0">
+            {/* Hidden placeholder for consistent height */}
+            &nbsp;
+          </span>
         )}
       </div>
 
@@ -152,7 +174,10 @@ export function ChatHeader({ onToggleSidebar }: ChatHeaderProps) {
       */}
       {/* --- TEST BUTTON END --- */}
 
-      <SettingsDialog open={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      <SettingsDialog
+        open={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
     </div>
-  )
+  );
 }
