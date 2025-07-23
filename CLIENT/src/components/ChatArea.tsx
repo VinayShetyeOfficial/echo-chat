@@ -12,6 +12,7 @@ import { MessageInput } from "./MessageInput";
 import type { Message } from "../types";
 import { UserPlus, Loader2 } from "lucide-react";
 import { useChat } from "@/contexts/ChatContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ChatAreaProps {
   messages: Message[];
@@ -34,6 +35,8 @@ export function ChatArea({
     saveScrollPosition,
     getScrollPosition,
   } = useChat();
+
+  const { user } = useAuth();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -129,7 +132,19 @@ export function ChatArea({
   }, [messages, channelSwitchLoading, initialScrollRestored]);
 
   const handleReply = (message: Message) => {
-    setActiveReplyTo(message);
+    // Ensure the sender is a full user object
+    setActiveReplyTo({
+      ...message,
+      sender:
+        message.sender && message.sender.username
+          ? message.sender
+          : {
+              id: message.sender?.id || "",
+              username: message.sender?.username || "Unknown User",
+              email: "",
+              isOnline: false,
+            },
+    });
   };
 
   const handleSendMessage = (text: string, attachments?: File[]) => {
@@ -138,11 +153,13 @@ export function ChatArea({
 
   const getSimplifiedReply = () => {
     if (!activeReplyTo) return null;
-
     return {
       id: activeReplyTo.id,
       text: activeReplyTo.text,
-      sender: activeReplyTo.sender.username,
+      sender:
+        activeReplyTo.sender.id === user?.id
+          ? "You"
+          : activeReplyTo.sender.username,
     };
   };
 
