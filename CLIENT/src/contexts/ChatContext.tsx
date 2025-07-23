@@ -532,7 +532,12 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       attachments: tempAttachments,
       reactions: [],
       isEdited: false,
-      replyTo: activeReplyTo || undefined, // Include reply reference if exists
+      replyTo: activeReplyTo
+        ? {
+            ...activeReplyTo,
+            sender: activeReplyTo.sender || null,
+          }
+        : undefined, // Include reply reference if exists
     };
 
     // 2. Optimistically update the UI
