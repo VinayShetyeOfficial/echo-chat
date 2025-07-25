@@ -781,9 +781,7 @@ export function ChatMessage({ message, onReply }: ChatMessageProps) {
         <div>
           <div className="flex items-center mb-1">
             <span className="font-medium mr-2">
-              {isCurrentUser
-                ? "You"
-                : message.sender?.username || "Unknown User"}
+              {message.sender?.username || "Unknown User"}
             </span>
             <span
               className="text-xs text-gray-400"
@@ -909,34 +907,14 @@ export function ChatMessage({ message, onReply }: ChatMessageProps) {
                         <div className="flex items-center">
                           <span className="text-xs font-semibold text-purple-200 flex items-center gap-1">
                             <span>
-                              {(() => {
-                                // Support both .sender and .user for replyTo
-                                const replySender =
-                                  message.replyTo.sender ||
-                                  message.replyTo.user;
-                                if (!replySender) return "Unknown User";
-                                if (replySender.id === user?.id) return "You";
-                                return (
-                                  replySender.username ||
-                                  replySender.id ||
-                                  "Unknown User"
-                                );
-                              })()}
+                              {message.replyTo.sender?.username || "Unknown"}
                             </span>
                             <span className="text-[10px] opacity-0 group-hover/reply:opacity-100 transition-opacity">
                               (click to view)
                             </span>
                           </span>
                         </div>
-                        <div
-                          className="text-xs text-gray-300/90 break-words mr-2"
-                          style={{
-                            maxWidth: "250px",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
+                        <div className="text-xs text-gray-300/90 break-words line-clamp-1 mr-2">
                           {message.replyTo.text}
                         </div>
                       </div>
