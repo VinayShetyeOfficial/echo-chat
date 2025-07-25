@@ -132,7 +132,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     if (user) {
       const SOCKET_URL =
-        import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
+        import.meta.env.VITE_API_URL || "http://localhost:3001";
 
       const socketInstance = io(SOCKET_URL, {
         auth: {
@@ -185,75 +185,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Update message list if it belongs to the active channel
       if (message.channelId === activeChannel?.id) {
-        setMessages((prev) => {
-          // Check if message already exists to prevent duplicates
-          const messageExists = prev.some(
-            (existingMessage) => existingMessage.id === message.id
-          );
-
-          if (messageExists) {
-            console.log(
-              `[Socket] Message ${message.id} already exists, skipping duplicate`
-            );
-            return prev;
-          }
-
-          // Additional check: Look for messages with same text, sender, and recent timestamp
-          // This catches cases where optimistic message was replaced but Socket.IO message is still being added
-          const recentDuplicate = prev.some((existingMessage) => {
-            const sameText = existingMessage.text === message.text;
-            const sameSender = existingMessage.sender.id === message.sender.id;
-            const timeDiff = Math.abs(
-              existingMessage.timestamp.getTime() - message.timestamp.getTime()
-            );
-            const isRecent = timeDiff < 5000; // Within 5 seconds
-
-            return sameText && sameSender && isRecent;
-          });
-
-          if (recentDuplicate) {
-            console.log(
-              `[Socket] Recent duplicate message detected for text "${message.text}", skipping`
-            );
-            return prev;
-          }
-
-          console.log(`[Socket] Adding new message ${message.id} to UI`);
-          return [...prev, message];
-        });
+        setMessages((prev) => [...prev, message]);
 
         // Also update the message cache
-        setMessageCache((prev) => {
-          const existingMessages = prev[message.channelId] || [];
-          const messageExists = existingMessages.some(
-            (existingMessage) => existingMessage.id === message.id
-          );
-
-          if (messageExists) {
-            return prev;
-          }
-
-          // Additional check: Look for messages with same text, sender, and recent timestamp
-          const recentDuplicate = existingMessages.some((existingMessage) => {
-            const sameText = existingMessage.text === message.text;
-            const sameSender = existingMessage.sender.id === message.sender.id;
-            const timeDiff = Math.abs(
-              existingMessage.timestamp.getTime() - message.timestamp.getTime()
-            );
-            const isRecent = timeDiff < 5000; // Within 5 seconds
-
-            return sameText && sameSender && isRecent;
-          });
-
-          if (recentDuplicate) {
-            return prev;
-          }
-
-          return {
-            ...prev,
-            [message.channelId]: [...existingMessages, message],
-          };
-        });
+        setMessageCache((prev) => ({
+          ...prev,
+          [message.channelId]: [...(prev[message.channelId] || []), message],
+        }));
       }
 
       // Update the lastMessage for the corresponding channel in the sidebar
@@ -532,12 +470,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       attachments: tempAttachments,
       reactions: [],
       isEdited: false,
-      replyTo: activeReplyTo
-        ? {
-            ...activeReplyTo,
-            sender: activeReplyTo.sender || null,
-          }
-        : undefined, // Include reply reference if exists
+      replyTo: activeReplyTo || undefined, // Include reply reference if exists
     };
 
     // 2. Optimistically update the UI
