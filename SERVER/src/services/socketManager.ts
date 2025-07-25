@@ -1,6 +1,6 @@
 import { Server as SocketIOServer } from "socket.io";
 import { Server as HTTPServer } from "http";
-import { verifyToken } from "../config/auth";
+import jwt from "jsonwebtoken";
 import { ConnectionCache } from "./connectionCache";
 import { User } from "../models/User";
 
@@ -46,13 +46,8 @@ export class SocketManager {
           return next(new Error("Authentication token required"));
         }
 
-        const decoded = verifyToken(token) as any;
-        if (!decoded || !decoded.id) {
-          console.log("[SocketManager] Invalid token, disconnecting");
-          return next(new Error("Invalid token"));
-        }
-
-        const user = await User.findById(decoded.id);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+        const user = await User.findById(decoded.userId);
 
         if (!user) {
           console.log("[SocketManager] User not found, disconnecting");
@@ -109,32 +104,22 @@ export class SocketManager {
         });
 
         // Handle joining channels
-        socket.on(
-          "join_channel",
-          async (data: string | { channelId: string }) => {
-            try {
-              const channelId =
-                typeof data === "string" ? data : data.channelId;
-              await this.handleJoinChannel(socket, channelId);
-            } catch (error) {
-              console.error("[SocketManager] Error joining channel:", error);
-            }
+        socket.on("join_channel", async (channelId: string) => {
+          try {
+            await this.handleJoinChannel(socket, channelId);
+          } catch (error) {
+            console.error("[SocketManager] Error joining channel:", error);
           }
-        );
+        });
 
         // Handle leaving channels
-        socket.on(
-          "leave_channel",
-          async (data: string | { channelId: string }) => {
-            try {
-              const channelId =
-                typeof data === "string" ? data : data.channelId;
-              await this.handleLeaveChannel(socket, channelId);
-            } catch (error) {
-              console.error("[SocketManager] Error leaving channel:", error);
-            }
+        socket.on("leave_channel", async (channelId: string) => {
+          try {
+            await this.handleLeaveChannel(socket, channelId);
+          } catch (error) {
+            console.error("[SocketManager] Error leaving channel:", error);
           }
-        );
+        });
 
         // Handle typing indicators
         socket.on("typing_start", (channelId: string) => {
@@ -251,18 +236,8 @@ export class SocketManager {
   // Public methods for other services to use
 
   public emitToChannel(channelId: string, event: string, data: any) {
-    console.log(
-      `[SocketManager] Attempting to emit ${event} to channel ${channelId}`
-    );
-    console.log(
-      `[SocketManager] Connected users in channel:`,
-      this.io.sockets.adapter.rooms.get(channelId)?.size || 0
-    );
-
     this.io.to(channelId).emit(event, data);
-    console.log(
-      `[SocketManager] Successfully emitted ${event} to channel ${channelId}`
-    );
+    console.log(`[SocketManager] Emitted ${event} to channel ${channelId}`);
   }
 
   public emitToUser(userId: string, event: string, data: any) {
