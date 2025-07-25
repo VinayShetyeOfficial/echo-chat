@@ -28,9 +28,6 @@ const socketManager = new SocketManager(httpServer);
 // Make io accessible to routes
 app.set("io", socketManager.getIO());
 
-// Make SocketManager accessible to controllers
-app.set("socketManager", socketManager);
-
 // Middleware
 app.use(
   cors({
